@@ -82,63 +82,62 @@ logShowM l t = t >>= logShow l
 sleep1 :: IO ()
 sleep1 = sleepMs $ 1 * seconds
 
--- >>> demo
-demo :: IO ()
-demo = do
-  logShowM "driver status" status
-
+-- >>> demoSessionDriverStatus
+demoSessionDriverStatus :: IO ()
+demoSessionDriverStatus = do 
   ses <- newDefaultFirefoxSession
   log "new session" $ txt ses
-  ---
-  logShowM "timeouts" $ getTimeouts ses
+  logShowM "driver status" status
+  deleteSession ses
 
-  let timeouts =
-        Timeouts
-          { pageLoad = 30 * seconds,
-            script = 11 * seconds,
-            implicit = 12 * seconds
-          }
-  setTimeouts ses timeouts
-  logShowM "timeouts" $ getTimeouts ses
-  ---
-  maximizeWindow ses
+-- >>> demoForwardBackRefresh
+demoForwardBackRefresh :: IO ()
+demoForwardBackRefresh = do
+  ses <- mkExtendedTimeoutsSession
+
   navigateTo ses theInternet
   logM "current url" $ getCurrentUrl ses
+  logM "title" $ getTitle ses
 
-  logShowM "minimizeWindow" $ minimizeWindow ses
   sleep1
-
-  logShowM "fullscreen" $ fullScreenWindow ses
-  sleep1
-
-  logShowM "maximizeWindow" $ maximizeWindow ses
 
   link <- findElement ses checkBoxesLinkCss
-  logM "check box link text" $ getElementText ses link
+  logTxt "navigating to check boxes page"
   elementClick ses link
 
-  sleepMs $ 5 * seconds
-  cbs <- findElements ses checkBoxesCss
-  forM_ cbs $ \cb ->
-    logShowM "checkBox checked property" $ getElementProperty ses cb "checked"
-
-  divs <- findElements ses divCss
-  forM_ divs $ \d ->
-    logShowM "div overflow value" $ getElementCssValue ses d "overflow"
-
-  -- so we can see the navigation worked
   sleep1
-
+  logM "current url" $ getCurrentUrl ses
+  logM "title" $ getTitle ses
+  logTxt "navigating back"
   back ses
   sleep1
 
+  logM "current url" $ getCurrentUrl ses
   logM "title" $ getTitle ses
+  logTxt "navigating forward"
 
   forward ses
   sleep1
 
+
+  logM "current url" $ getCurrentUrl ses
+  logM "title" $ getTitle ses
+  logTxt "refreshing"
+
   refresh ses
   sleep1
+  
+  logM "current url" $ getCurrentUrl ses
+  logM "title" $ getTitle ses
+
+  deleteSession ses
+
+
+-- >>> demoWindowHandles
+demoWindowHandles :: IO ()
+demoWindowHandles = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
 
   logM "window Handle" $ getWindowHandle ses
 
@@ -153,21 +152,70 @@ demo = do
   closeWindow ses
   log "windows closed" $ txt ses
 
+  logShowM "all windows handles" $ getWindowHandles ses
   deleteSession ses
 
--- >>> demo2
-demo2 :: IO ()
-demo2 = do
-  logShowM "driver status" status
+-- >>> demoWindowSizes
+demoWindowSizes :: IO ()
+demoWindowSizes = do
+  ses <- mkExtendedTimeoutsSession
+  ---
+  maximizeWindow ses
+  navigateTo ses theInternet
+  sleep1
 
+  logShowM "minimizeWindow" $ minimizeWindow ses
+  sleep1
+
+  logShowM "fullscreen" $ fullScreenWindow ses
+  sleep1
+
+  logShowM "maximizeWindow" $ maximizeWindow ses
+  sleep1
+  
+  deleteSession ses
+
+-- >>> demo
+demoElementPageProps :: IO ()
+demoElementPageProps = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  logM "current url" $ getCurrentUrl ses
+  logM "title" $ getTitle ses
+
+  link <- findElement ses checkBoxesLinkCss
+  logM "check box link text" $ getElementText ses link
+
+  cbs <- findElements ses checkBoxesCss
+  forM_ cbs $ \cb ->
+    logShowM "checkBox checked property" $ getElementProperty ses cb "checked"
+
+  divs <- findElements ses divCss
+  forM_ divs $ \d ->
+    logShowM "div overflow value" $ getElementCssValue ses d "overflow"
+
+  deleteSession ses
+
+-- >>> demoTimeouts
+demoTimeouts :: IO ()
+demoTimeouts = do
   ses <- newDefaultFirefoxSession
-  setTimeouts
-    ses
-    Timeouts
-      { pageLoad = 30 * seconds,
-        script = 11 * seconds,
-        implicit = 12 * seconds
-      }
+  log "new session" $ txt ses
+  ---
+  logShowM "timeouts" $ getTimeouts ses
+  setTimeouts ses $
+        Timeouts
+          { pageLoad = 50 * seconds,
+            script = 11 * seconds,
+            implicit = 12 * seconds
+          }
+  logShowM "updated timeouts" $ getTimeouts ses
+  deleteSession ses
+
+-- >>> demoWindowRecs
+demoWindowRecs :: IO ()
+demoWindowRecs = do
+  ses <- mkExtendedTimeoutsSession
   ---
   logShowM "window rect" $ getWindowRect ses
   sleepMs $ 2 * seconds
@@ -184,10 +232,28 @@ demo2 = do
 
   deleteSession ses
 
+
+-- >>> demoWindowFindElement
+demoWindowFindElement :: IO ()
+demoWindowFindElement = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses inputsUrl
+  allElms <- findElements ses anyElmCss
+  logShow "all elements" allElms
+  div' <- findElement ses contentCss
+  input <- findElementFromElement ses div' inputTagCss
+  logShow "input tag" input
+
+  els <- findElementsFromElement ses div' anyElmCss
+  logShow "elements in div" els
+
+  deleteSession ses
+
+
 -- >>> demoFrames
 demoFrames :: IO ()
 demoFrames = do
-  ses <- newDefaultFirefoxSession
+  ses <- mkExtendedTimeoutsSession
   navigateTo ses framesUrl
 
   logTxt "At top level frame"
@@ -241,12 +307,13 @@ demoFrames = do
 bottomFameExists :: SessionId -> IO Bool
 bottomFameExists ses = not . null <$> findElements ses bottomFrameCss
 
+
 -- >>> demoShadowDom
 demoShadowDom :: IO ()
 demoShadowDom = do
   -- TODO: Session deletion causes gheckoDriver to thow an error
   -- even though the steps all work - driver bug? investiggate log
-  ses <- newDefaultFirefoxSession
+  ses <- mkExtendedTimeoutsSession
   navigateTo ses shadowDomUrl
 
   -- Find the custom element:
@@ -275,16 +342,8 @@ demoShadowDom = do
 -- >>> demoIsElementSelected
 demoIsElementSelected :: IO ()
 demoIsElementSelected = do
+  ses <- mkExtendedTimeoutsSession
   logShowM "driver status" status
-
-  ses <- newDefaultFirefoxSession
-  setTimeouts
-    ses
-    Timeouts
-      { pageLoad = 30 * seconds,
-        script = 11 * seconds,
-        implicit = 12 * seconds
-      }
   navigateTo ses checkBoxesUrl
   allCbs <- findElements ses checkBoxesCss
   forM_ allCbs $ \cb -> do
@@ -296,3 +355,12 @@ demoIsElementSelected = do
 
   deleteSession ses
 
+mkExtendedTimeoutsSession :: IO SessionId
+mkExtendedTimeoutsSession = do
+  ses <- newDefaultFirefoxSession
+  setTimeouts ses $ Timeouts
+          { pageLoad = 30 * seconds,
+            script = 11 * seconds,
+            implicit = 12 * seconds
+          }
+  pure ses

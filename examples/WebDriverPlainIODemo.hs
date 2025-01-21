@@ -111,7 +111,7 @@ demoSessionDriverStatus = do
 -- >>> demoSendKeysClear
 demoSendKeysClear :: IO ()
 demoSendKeysClear = do
-  ses <- newDefaultFirefoxSession
+  ses <- mkExtendedTimeoutsSession
   navigateTo ses loginUrl
   usr <- findElement ses userNameCss
 

@@ -44,7 +44,12 @@ module WebDriverIO
     switchToFrame,
     switchToParentFrame,
     getElementProperty,
-    getElementCssValue
+    getElementCssValue,
+    getElementTagName,
+    getElementRect,
+    isElementEnabled,
+    getElementComputedRole,
+    getElementComputedLabel
   )
 where
 
@@ -176,6 +181,21 @@ getElementShadowRoot s = run . W.getElementShadowRoot s
 
 findElementFromShadowRoot :: SessionId -> ElementId -> Selector -> IO ElementId
 findElementFromShadowRoot s e = run . W.findElementFromShadowRoot s e
+
+getElementTagName :: SessionId -> ElementId -> IO Text
+getElementTagName s = run . W.getElementTagName s
+
+getElementRect :: SessionId -> ElementId -> IO W.WindowRect
+getElementRect s = run . W.getElementRect s
+
+isElementEnabled :: SessionId -> ElementId -> IO Bool
+isElementEnabled s = run . W.isElementEnabled s
+
+getElementComputedRole :: SessionId -> ElementId -> IO Text
+getElementComputedRole s = run . W.getElementComputedRole s
+
+getElementComputedLabel :: SessionId -> ElementId -> IO Text
+getElementComputedLabel s = run . W.getElementComputedLabel s
 
 findElements :: SessionId -> Selector -> IO [ElementId]
 findElements s = run . W.findElements s

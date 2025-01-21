@@ -17,7 +17,7 @@ import WebDriverDemoUtils
     myTextCss,
     shadowDomUrl,
     theInternet,
-    topFrameCSS, loginUrl, userNameCss, checkBoxesUrl,
+    topFrameCSS, loginUrl, userNameCss, checkBoxesUrl, h3TagCss,
   )
 import WebDriverIO
   ( FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
@@ -59,7 +59,7 @@ import WebDriverIO
     status,
     switchToFrame,
     switchToParentFrame,
-    switchToWindow, findElementsFromShadowRoot, isElementSelected,
+    switchToWindow, findElementsFromShadowRoot, isElementSelected, getElementRect, getElementTagName, isElementEnabled, getElementAttribute, getElementComputedRole, getElementComputedLabel,
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
@@ -191,8 +191,17 @@ demoElementPageProps = do
   cbs <- findElements ses checkBoxesCss
   forM_ cbs $ \cb -> do
     logShowM "checkBox checked property" $ getElementProperty ses cb "checked"
-    logShowM "getElementAttribute type" $ getElementProperty ses cb "type"
+    logShowM "getElementAttribute type" $ getElementAttribute ses cb "type"
     logShowM "getElementCssValue display" $ getElementCssValue ses cb "display"
+    logShowM "getElementTagName" $ getElementTagName ses cb
+    logShowM "getElementRect" $ getElementRect ses cb
+    logShowM "isElementEnabled" $ isElementEnabled ses cb
+    logShowM "getElementComputedRole" $ getElementComputedRole ses cb
+    logShowM "getElementComputedLabel" $ getElementComputedLabel ses cb
+
+  header <- findElement ses h3TagCss
+  logShowM "header computed role" $ getElementComputedRole ses header
+  logShowM "header computed label" $ getElementComputedLabel ses header
 
   divs <- findElements ses divCss
   forM_ divs $ \d ->

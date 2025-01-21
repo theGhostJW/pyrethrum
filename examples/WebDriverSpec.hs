@@ -53,7 +53,12 @@ module WebDriverSpec
     setWindowRect,
     findElementsFromShadowRoot,
     getElementShadowRoot,
-    findElementFromShadowRoot
+    findElementFromShadowRoot,
+    getElementTagName,
+    getElementRect,
+    isElementEnabled,
+    getElementComputedRole,
+    getElementComputedLabel
   )
 where
 
@@ -460,10 +465,24 @@ getElementText :: SessionId -> ElementId -> W3Spec Text
 getElementText sessionId elementId = Get "Get Element Text" (elementUri1 sessionId elementId "text") parseBodyTxt
 
 -- GET 	/session/{session id}/element/{element id}/name 	Get Element Tag Name
+getElementTagName :: SessionId -> ElementId -> W3Spec Text
+getElementTagName sessionId elementId = Get "Get Element Tag Name" (elementUri1 sessionId elementId "name") parseBodyTxt
+
 -- GET 	/session/{session id}/element/{element id}/rect 	Get Element Rect
+getElementRect :: SessionId -> ElementId -> W3Spec WindowRect
+getElementRect sessionId elementId = Get "Get Element Rect" (elementUri1 sessionId elementId "rect") parseWindowRect
+
 -- GET 	/session/{session id}/element/{element id}/enabled 	Is Element Enabled
+isElementEnabled :: SessionId -> ElementId -> W3Spec Bool
+isElementEnabled sessionId elementId = Get "Is Element Enabled" (elementUri1 sessionId elementId "enabled") parseBodyBool
+
 -- GET 	/session/{session id}/element/{element id}/computedrole 	Get Computed Role
+getElementComputedRole :: SessionId -> ElementId -> W3Spec Text
+getElementComputedRole sessionId elementId = Get "Get Computed Role" (elementUri1 sessionId elementId "computedrole") parseBodyTxt
+
 -- GET 	/session/{session id}/element/{element id}/computedlabel 	Get Computed Label
+getElementComputedLabel :: SessionId -> ElementId -> W3Spec Text
+getElementComputedLabel sessionId elementId = Get "Get Computed Label" (elementUri1 sessionId elementId "computedlabel") parseBodyTxt
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
 elementClick :: SessionId -> ElementId -> W3Spec ()

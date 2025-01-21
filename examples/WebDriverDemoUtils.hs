@@ -57,6 +57,9 @@ contentCss = CSS "#content"
 inputTagCss :: Selector
 inputTagCss = CSS "input"
 
+h3TagCss :: Selector
+h3TagCss = CSS "h3"
+
 anyElmCss :: Selector
 anyElmCss = CSS "*"
 

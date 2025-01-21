@@ -58,7 +58,9 @@ module WebDriverSpec
     getElementRect,
     isElementEnabled,
     getElementComputedRole,
-    getElementComputedLabel
+    getElementComputedLabel,
+    elementClear,
+    elementSendKeys
   )
 where
 
@@ -488,9 +490,18 @@ getElementComputedLabel sessionId elementId = Get "Get Computed Label" (elementU
 elementClick :: SessionId -> ElementId -> W3Spec ()
 elementClick sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
 
+
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
+elementClear :: SessionId -> ElementId -> W3Spec ()
+elementClear sessionId elementId = PostEmpty "Clear Element" (elementUri1 sessionId elementId "clear") voidParser
+
 -- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
+elementSendKeys :: SessionId -> ElementId -> Text -> W3Spec ()
+elementSendKeys sessionId elementId keysToSend = Post "Send Keys to Element" (elementUri1 sessionId elementId "value") (keysJson keysToSend) voidParser
+
+
 -- GET 	/session/{session id}/source 	Get Page Source
+
 -- POST 	/session/{session id}/execute/sync 	Execute Script
 -- POST 	/session/{session id}/execute/async 	Execute Async Script
 -- GET 	/session/{session id}/cookie 	Get All Cookies
@@ -699,3 +710,6 @@ parseDriverStatus Response {statusCode, statusMessage} =
       500 -> ServiceError {statusCode, statusMessage}
       501 -> Running
       _ -> Unknown {statusCode, statusMessage}
+
+keysJson :: Text -> Value
+keysJson keysToSend = object ["text" .= keysToSend]

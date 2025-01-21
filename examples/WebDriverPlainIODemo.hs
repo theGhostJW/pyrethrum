@@ -7,17 +7,21 @@ import WebDriverDemoUtils
     bottomFrameCss,
     checkBoxesCss,
     checkBoxesLinkCss,
+    checkBoxesUrl,
     contentCss,
     divCss,
     framesUrl,
+    h3TagCss,
     inputTagCss,
     inputsUrl,
+    loginUrl,
     midFrameCss,
     midFrameTitle,
     myTextCss,
     shadowDomUrl,
     theInternet,
-    topFrameCSS, loginUrl, userNameCss, checkBoxesUrl, h3TagCss,
+    topFrameCSS,
+    userNameCss,
   )
 import WebDriverIO
   ( FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
@@ -26,27 +30,35 @@ import WebDriverIO
     WindowHandle (..),
     WindowRect (..),
     back,
-    elementClick,
     closeWindow,
     deleteSession,
+    elementClick,
     findElement,
     findElementFromElement,
     findElementFromShadowRoot,
     findElements,
     findElementsFromElement,
+    findElementsFromShadowRoot,
     forward,
     fullScreenWindow,
     getActiveElement,
     getCurrentUrl,
+    getElementAttribute,
+    getElementComputedLabel,
+    getElementComputedRole,
     getElementCssValue,
     getElementProperty,
+    getElementRect,
     getElementShadowRoot,
+    getElementTagName,
     getElementText,
     getTimeouts,
     getTitle,
     getWindowHandle,
     getWindowHandles,
     getWindowRect,
+    isElementEnabled,
+    isElementSelected,
     maximizeWindow,
     minimizeWindow,
     navigateTo,
@@ -59,11 +71,12 @@ import WebDriverIO
     status,
     switchToFrame,
     switchToParentFrame,
-    switchToWindow, findElementsFromShadowRoot, isElementSelected, getElementRect, getElementTagName, isElementEnabled, getElementAttribute, getElementComputedRole, getElementComputedLabel,
+    switchToWindow,
+    elementClear,
+    elementSendKeys
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
-import WebDriverEffect (clickElem)
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn
@@ -83,12 +96,32 @@ logShowM l t = t >>= logShow l
 sleep1 :: IO ()
 sleep1 = sleepMs $ 1 * seconds
 
+sleep2 :: IO ()
+sleep2 = sleepMs $ 2 * seconds
+
 -- >>> demoSessionDriverStatus
 demoSessionDriverStatus :: IO ()
-demoSessionDriverStatus = do 
+demoSessionDriverStatus = do
   ses <- newDefaultFirefoxSession
   log "new session" $ txt ses
   logShowM "driver status" status
+  deleteSession ses
+
+
+-- >>> demoSendKeysClear
+demoSendKeysClear :: IO ()
+demoSendKeysClear = do
+  ses <- newDefaultFirefoxSession
+  navigateTo ses loginUrl
+  usr <- findElement ses userNameCss
+
+  logTxt "fill in user name"
+  elementSendKeys ses usr "user name"
+  sleep2
+
+  logTxt "clear user name"
+  elementClear ses usr
+  sleep2
   deleteSession ses
 
 -- >>> demoForwardBackRefresh
@@ -120,7 +153,6 @@ demoForwardBackRefresh = do
   forward ses
   sleep1
 
-
   logM "current url" $ getCurrentUrl ses
   logM "title" $ getTitle ses
   logTxt "refreshing"
@@ -132,7 +164,6 @@ demoForwardBackRefresh = do
   logM "title" $ getTitle ses
 
   deleteSession ses
-
 
 -- >>> demoWindowHandles
 demoWindowHandles :: IO ()
@@ -173,7 +204,7 @@ demoWindowSizes = do
 
   logShowM "maximizeWindow" $ maximizeWindow ses
   sleep1
-  
+
   deleteSession ses
 
 -- >>> demoElementPageProps
@@ -217,11 +248,11 @@ demoTimeouts = do
   ---
   logShowM "timeouts" $ getTimeouts ses
   setTimeouts ses $
-        Timeouts
-          { pageLoad = 50 * seconds,
-            script = 11 * seconds,
-            implicit = 12 * seconds
-          }
+    Timeouts
+      { pageLoad = 50 * seconds,
+        script = 11 * seconds,
+        implicit = 12 * seconds
+      }
   logShowM "updated timeouts" $ getTimeouts ses
   deleteSession ses
 
@@ -245,7 +276,6 @@ demoWindowRecs = do
 
   deleteSession ses
 
-
 -- >>> demoWindowFindElement
 demoWindowFindElement :: IO ()
 demoWindowFindElement = do
@@ -261,7 +291,6 @@ demoWindowFindElement = do
   logShow "elements in div" els
 
   deleteSession ses
-
 
 -- >>> demoFrames
 demoFrames :: IO ()
@@ -320,7 +349,6 @@ demoFrames = do
 bottomFameExists :: SessionId -> IO Bool
 bottomFameExists ses = not . null <$> findElements ses bottomFrameCss
 
-
 -- >>> demoShadowDom
 demoShadowDom :: IO ()
 demoShadowDom = do
@@ -332,7 +360,7 @@ demoShadowDom = do
   -- Find the custom element:
   myParagraphId <- findElement ses (CSS "my-paragraph")
   logShow "my-paragraph" myParagraphId
-  
+
   -- Get its shadow root:
   shadowRootId <- getElementShadowRoot ses myParagraphId
   logShow "shadowRootId" shadowRootId
@@ -346,11 +374,10 @@ demoShadowDom = do
 
   srootElm <- findElementFromShadowRoot ses myParagraphId anyElmCss
   logShow "shadow root element" srootElm
-  
+
   -- Retrieve text from the shadow element:
   logShowM "shadow text" $ getElementText ses srootElm
   deleteSession ses
-
 
 -- >>> demoIsElementSelected
 demoIsElementSelected :: IO ()
@@ -371,9 +398,10 @@ demoIsElementSelected = do
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do
   ses <- newDefaultFirefoxSession
-  setTimeouts ses $ Timeouts
-          { pageLoad = 30 * seconds,
-            script = 11 * seconds,
-            implicit = 12 * seconds
-          }
+  setTimeouts ses $
+    Timeouts
+      { pageLoad = 30 * seconds,
+        script = 11 * seconds,
+        implicit = 12 * seconds
+      }
   pure ses

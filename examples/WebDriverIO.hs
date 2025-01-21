@@ -49,7 +49,9 @@ module WebDriverIO
     getElementRect,
     isElementEnabled,
     getElementComputedRole,
-    getElementComputedLabel
+    getElementComputedLabel,
+    elementClear,
+    elementSendKeys
   )
 where
 
@@ -217,6 +219,12 @@ getElementAttribute s eid = run . W.getElementAttribute s eid
 
 getElementCssValue :: SessionId -> ElementId -> Text -> IO Text
 getElementCssValue s eid = run . W.getElementCssValue s eid
+
+elementClear :: SessionId -> ElementId -> IO ()
+elementClear s = run . W.elementClear s
+
+elementSendKeys :: SessionId -> ElementId -> Text -> IO ()
+elementSendKeys s eid = run . W.elementSendKeys s eid
 
 -- ############# Utils #############
 

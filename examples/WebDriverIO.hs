@@ -51,7 +51,11 @@ module WebDriverIO
     getElementComputedRole,
     getElementComputedLabel,
     elementClear,
-    elementSendKeys
+    elementSendKeys,
+    printPage,
+    getPageSource,
+    takeScreenshot,
+    takeElementScreenshot
   )
 where
 
@@ -225,6 +229,19 @@ elementClear s = run . W.elementClear s
 
 elementSendKeys :: SessionId -> ElementId -> Text -> IO ()
 elementSendKeys s eid = run . W.elementSendKeys s eid
+
+getPageSource :: SessionId -> IO Text
+getPageSource = run . W.getPageSource
+
+takeScreenshot :: SessionId -> IO Text
+takeScreenshot = run . W.takeScreenshot
+
+takeElementScreenshot :: SessionId -> ElementId -> IO Text
+takeElementScreenshot s = run . W.takeElementScreenshot s
+
+printPage :: SessionId -> IO Text
+printPage = run . W.printPage
+
 
 -- ############# Utils #############
 

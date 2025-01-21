@@ -60,7 +60,11 @@ module WebDriverSpec
     getElementComputedRole,
     getElementComputedLabel,
     elementClear,
-    elementSendKeys
+    elementSendKeys,
+    getPageSource,
+    takeScreenshot,
+    takeElementScreenshot,
+    printPage
   )
 where
 
@@ -490,7 +494,6 @@ getElementComputedLabel sessionId elementId = Get "Get Computed Label" (elementU
 elementClick :: SessionId -> ElementId -> W3Spec ()
 elementClick sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
 
-
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 elementClear :: SessionId -> ElementId -> W3Spec ()
 elementClear sessionId elementId = PostEmpty "Clear Element" (elementUri1 sessionId elementId "clear") voidParser
@@ -499,8 +502,9 @@ elementClear sessionId elementId = PostEmpty "Clear Element" (elementUri1 sessio
 elementSendKeys :: SessionId -> ElementId -> Text -> W3Spec ()
 elementSendKeys sessionId elementId keysToSend = Post "Send Keys to Element" (elementUri1 sessionId elementId "value") (keysJson keysToSend) voidParser
 
-
 -- GET 	/session/{session id}/source 	Get Page Source
+getPageSource :: SessionId -> W3Spec Text
+getPageSource sessionId = Get "Get Page Source" (sessionUri1 sessionId "source") parseBodyTxt
 
 -- POST 	/session/{session id}/execute/sync 	Execute Script
 -- POST 	/session/{session id}/execute/async 	Execute Async Script
@@ -516,8 +520,17 @@ elementSendKeys sessionId elementId keysToSend = Post "Send Keys to Element" (el
 -- GET 	/session/{session id}/alert/text 	Get Alert Text
 -- POST 	/session/{session id}/alert/text 	Send Alert Text
 -- GET 	/session/{session id}/screenshot 	Take Screenshot
+takeScreenshot :: SessionId -> W3Spec Text
+takeScreenshot sessionId = Get "Take Screenshot" (sessionUri1 sessionId "screenshot") parseBodyTxt
+
 -- GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
+takeElementScreenshot :: SessionId -> ElementId -> W3Spec Text
+takeElementScreenshot sessionId elementId = Get "Take Element Screenshot" (elementUri1 sessionId elementId "screenshot") parseBodyTxt
+
 -- POST 	/session/{session id}/print 	Print Page
+printPage :: SessionId -> W3Spec Text
+printPage sessionId = PostEmpty "Print Page" (sessionUri1 sessionId "print") parseBodyTxt
+
 
 findElement' :: SessionId -> Value -> W3Spec ElementId
 findElement' sessionRef selector = Post "Find Element" (sessionUri1 sessionRef "element") selector parseElementRef

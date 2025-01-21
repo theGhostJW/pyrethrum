@@ -64,6 +64,7 @@ import WebDriverIO
     navigateTo,
     newDefaultFirefoxSession,
     newWindow,
+    printPage,
     refresh,
     setTimeouts,
     setWindowRect,
@@ -73,7 +74,7 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     elementClear,
-    elementSendKeys
+    elementSendKeys, getPageSource, takeScreenshot, takeElementScreenshot
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
@@ -394,6 +395,32 @@ demoIsElementSelected = do
     logTxt "------------------"
 
   deleteSession ses
+
+-- >>> demoGetPageSourceScreenShot
+demoGetPageSourceScreenShot :: IO ()
+demoGetPageSourceScreenShot = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  logTxt "!!!!! Page Source !!!!!"
+  logShowM "page source" $ getPageSource ses
+
+  logTxt "!!!!! Screenshot!!!!!"
+  logShowM "take screenshot" $ takeScreenshot ses
+
+  logTxt "!!!!! Screenshot Element !!!!!"
+  chkBoxLink <- findElement ses checkBoxesLinkCss
+  logShowM "take element screenshot" $ takeElementScreenshot ses chkBoxLink
+  deleteSession ses
+
+-- >>> demoPrintPage
+demoPrintPage :: IO ()
+demoPrintPage = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  -- pdf (encoded string)
+  logM "print page" $ printPage ses
+  deleteSession ses
+
 
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do

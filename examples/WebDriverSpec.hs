@@ -519,6 +519,7 @@ getPageSource sessionId = Get "Get Page Source" (sessionUri1 sessionId "source")
 -- POST 	/session/{session id}/alert/accept 	Accept Alert
 -- GET 	/session/{session id}/alert/text 	Get Alert Text
 -- POST 	/session/{session id}/alert/text 	Send Alert Text
+
 -- GET 	/session/{session id}/screenshot 	Take Screenshot
 takeScreenshot :: SessionId -> W3Spec Text
 takeScreenshot sessionId = Get "Take Screenshot" (sessionUri1 sessionId "screenshot") parseBodyTxt
@@ -530,7 +531,6 @@ takeElementScreenshot sessionId elementId = Get "Take Element Screenshot" (eleme
 -- POST 	/session/{session id}/print 	Print Page
 printPage :: SessionId -> W3Spec Text
 printPage sessionId = PostEmpty "Print Page" (sessionUri1 sessionId "print") parseBodyTxt
-
 
 findElement' :: SessionId -> Value -> W3Spec ElementId
 findElement' sessionRef selector = Post "Find Element" (sessionUri1 sessionRef "element") selector parseElementRef

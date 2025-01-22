@@ -3,7 +3,6 @@ module WebDriverPlainIODemo where
 import Data.Aeson (Value (..))
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
-import BasePrelude qualified
 import WebDriverDemoUtils
   ( anyElmCss,
     bottomFrameCss,

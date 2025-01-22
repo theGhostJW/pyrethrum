@@ -576,7 +576,12 @@ deleteAllCookies :: SessionId -> W3Spec ()
 deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId "cookie") voidParser
 
 -- POST 	/session/{session id}/actions 	Perform Actions
+performActions :: SessionId -> Value -> W3Spec ()
+performActions sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") actions voidParser
+
 -- DELETE 	/session/{session id}/actions 	Release Actions
+releaseActions :: SessionId -> W3Spec ()
+releaseActions sessionId = Delete "Release Actions" (sessionUri1 sessionId "actions") voidParser
 
 -- POST 	/session/{session id}/alert/dismiss 	Dismiss Alert
 dismissAlert :: SessionId -> W3Spec ()

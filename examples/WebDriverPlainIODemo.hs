@@ -18,7 +18,6 @@ import WebDriverDemoUtils
     loginUrl,
     midFrameCss,
     midFrameTitle,
-    myTextCss,
     shadowDomUrl,
     theInternet,
     topFrameCSS,
@@ -30,6 +29,7 @@ import WebDriverIO
     Timeouts (..),
     WindowHandle (..),
     WindowRect (..),
+    SameSite (..),
     back,
     closeWindow,
     deleteSession,
@@ -47,14 +47,13 @@ import WebDriverIO
     forward,
     fullScreenWindow,
     getActiveElement,
+    getAllCookies,
     getCurrentUrl,
     getElementAttribute,
     getElementComputedLabel,
     getElementComputedRole,
     getElementCssValue,
     getElementProperty,
-    getElementRect,
-    getElementShadowRoot,
     getElementTagName,
     getElementText,
     getPageSource,
@@ -80,10 +79,9 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     takeElementScreenshot,
-    takeScreenshot,
+    takeScreenshot, Cookie (..), getElementRect, Selector (..), getElementShadowRoot, getNamedCookie, addCookie, deleteCookie, deleteAllCookies,
   )
 import WebDriverPure (seconds)
-import WebDriverSpec (Selector (..))
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn
@@ -438,6 +436,39 @@ demoExecuteScript = do
   logTxt "after asynch alert"
   sleep2
   deleteSession ses
+
+-- >>> demoCookies
+demoCookies :: IO ()
+demoCookies = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  logShowM "cookies" $ getAllCookies ses
+
+  logShowM "getNamedCookie: optimizelyEndUserId" $ getNamedCookie ses "optimizelyEndUserId"
+  
+  let myCookie = Cookie
+        { name = "myCookie",
+          value = "myCookieValue",
+          path = Just "/",
+          domain = Just "the-internet.herokuapp.com",
+          secure = Just True,
+          sameSite = Just Strict,
+          httpOnly = Just False,
+          expiry = Just 2772072677
+        }
+  
+  logShow "cookie to add" myCookie
+  logShowM "addCookie" $ addCookie ses myCookie
+  logShowM "cookies after add" $ getAllCookies ses
+
+  logShowM "deleteCookie (myCookie)" $ deleteCookie ses "myCookie"
+  logShowM "cookies after delete" $ getAllCookies ses
+
+  logShowM "deleteAllCookies" $ deleteAllCookies ses
+  logShowM "cookies after delete all" $ getAllCookies ses
+  deleteSession ses
+
+
 
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do

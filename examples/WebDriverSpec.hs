@@ -6,6 +6,7 @@ module WebDriverSpec
     ElementId (..),
     SessionId (..),
     DriverStatus (..),
+    SameSite (..),
     Selector (..),
     Cookie (..),
     Timeouts (..),
@@ -66,7 +67,12 @@ module WebDriverSpec
     takeElementScreenshot,
     printPage,
     executeScript,
-    executeScriptAsync
+    executeScriptAsync,
+    getAllCookies,
+    getNamedCookie,
+    addCookie,
+    deleteCookie,
+    deleteAllCookies
   )
 where
 
@@ -83,6 +89,7 @@ import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
 import PyrethrumExtras (toS)
 import Prelude hiding (get)
+import Data.Text (pack)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -162,6 +169,10 @@ data SameSite
   | None
   deriving (Show, Eq)
 
+instance ToJSON SameSite where
+  toJSON :: SameSite -> Value
+  toJSON = String . pack . BasePrelude.show
+
 data FrameReference
   = TopLevelFrame
   | FrameNumber Word16
@@ -185,13 +196,32 @@ data Cookie = Cookie
     -- optional
     path :: Maybe Text,
     domain :: Maybe Text,
-    secureOnly :: Maybe Bool,
+    secure :: Maybe Bool,
     httpOnly :: Maybe Bool,
     sameSite :: Maybe SameSite,
     -- When the cookie expires, specified in seconds since Unix Epoch.
     expiry :: Maybe Int
   }
   deriving (Show)
+
+instance ToJSON Cookie where
+  toJSON :: Cookie -> Value
+  toJSON Cookie {name, value, path, domain, secure, httpOnly, sameSite, expiry} =
+    object $
+      [ "name" .= name,
+        "value" .= value
+      ]
+        <> catMaybes
+          [ ("path" .=) <$> path,
+            ("domain" .=) <$> domain,
+            ("secure" .=) <$> secure,
+            ("httpOnly" .=) <$> httpOnly,
+            ("sameSite" .=) <$> sameSite,
+            ("expiry" .=) <$> expiry
+          ]
+
+cookieJSON :: Cookie -> Value
+cookieJSON c = object [ "cookie" .= c ]
 
 -- TODO: add more selector types
 newtype Selector = CSS Text
@@ -517,10 +547,24 @@ executeScriptAsync :: SessionId -> Text -> [Value] -> W3Spec Value
 executeScriptAsync sessionId script args = Post "Execute Async Script" (sessionUri2 sessionId "execute" "async") (mkScript script args) bodyValue
 
 -- GET 	/session/{session id}/cookie 	Get All Cookies
+getAllCookies :: SessionId -> W3Spec [Cookie]
+getAllCookies sessionId = Get "Get All Cookies" (sessionUri1 sessionId "cookie") parseCookies
+
 -- GET 	/session/{session id}/cookie/{name} 	Get Named Cookie
+getNamedCookie :: SessionId -> Text -> W3Spec Cookie
+getNamedCookie sessionId cookieName = Get "Get Named Cookie" (sessionUri2 sessionId "cookie" cookieName) parseCookie
+
 -- POST 	/session/{session id}/cookie 	Add Cookie
+addCookie :: SessionId -> Cookie -> W3Spec ()
+addCookie sessionId cookie = Post "Add Cookie" (sessionUri1 sessionId "cookie") (cookieJSON cookie) voidParser
+
 -- DELETE 	/session/{session id}/cookie/{name} 	Delete Cookie
+deleteCookie :: SessionId -> Text -> W3Spec ()
+deleteCookie sessionId cookieName = Delete "Delete Cookie" (sessionUri2 sessionId "cookie" cookieName) voidParser
+
 -- DELETE 	/session/{session id}/cookie 	Delete All Cookies
+deleteAllCookies :: SessionId -> W3Spec ()
+deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId "cookie") voidParser
 
 -- POST 	/session/{session id}/actions 	Perform Actions
 -- DELETE 	/session/{session id}/actions 	Release Actions
@@ -602,6 +646,32 @@ windowHandleFromValue :: Value -> Maybe WindowHandle
 windowHandleFromValue v =
   liftA2 Handle (lookupTxt "handle" v) (lookupTxt "type" v)
 
+
+parseCookies :: HttpResponse -> Maybe [Cookie]
+parseCookies r =
+  bodyValue r
+    >>= \case
+      Array a -> Just $ mapMaybe cookieFromBody (toList a)
+      _ -> Nothing
+
+parseCookie :: HttpResponse -> Maybe Cookie
+parseCookie r =
+  bodyValue r
+    >>= cookieFromBody
+
+cookieFromBody :: Value -> Maybe Cookie
+cookieFromBody b = do
+    name <- lookupTxt "name" b
+    value <- lookupTxt "value" b
+    let 
+      path = lookupTxt "path" b
+      domain = lookupTxt "domain" b
+      secure = lookupBool "secure" b
+      httpOnly = lookupBool "httpOnly" b
+      sameSite = lookupSameSite "sameSite" b
+      expiry = lookupInt "expiry" b
+    pure $ Cookie {..}
+
 parseTimeouts :: HttpResponse -> Maybe Timeouts
 parseTimeouts r =
   liftA3
@@ -654,6 +724,18 @@ lookup k = \case
 
 lookupTxt :: Key -> Value -> Maybe Text
 lookupTxt k v = lookup k v >>= asText
+
+lookupBool :: Key -> Value -> Maybe Bool
+lookupBool k v = lookup k v >>= \case
+  Bool b -> Just b
+  _ -> Nothing
+
+lookupSameSite :: Key -> Value -> Maybe SameSite
+lookupSameSite k v = lookup k v >>= \case
+  String "Lax" -> Just Lax
+  String "Strict" -> Just Strict
+  String "None" -> Just None
+  _ -> Nothing
 
 lookupInt :: Key -> Value -> Maybe Int
 lookupInt k v = lookup k v >>= asInt

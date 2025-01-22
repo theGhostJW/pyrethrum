@@ -3,9 +3,12 @@
 module WebDriverIO
   ( W.Timeouts (..),
     W.WindowHandle (..),
+    W.SameSite(..),
+    W.Selector(..),
     W.SessionId (..),
     W.FrameReference (..),
     W.WindowRect (..),
+    W.Cookie (..),
     status,
     findElementFromElement,
     findElementsFromElement,
@@ -57,7 +60,12 @@ module WebDriverIO
     takeScreenshot,
     takeElementScreenshot,
     executeScript,
-    executeScriptAsync
+    executeScriptAsync,
+    getAllCookies,
+    getNamedCookie,
+    addCookie,
+    deleteCookie,
+    deleteAllCookies
   )
 where
 
@@ -249,6 +257,21 @@ executeScript ses script = run . W.executeScript ses script
 
 executeScriptAsync :: SessionId -> Text -> [Value] -> IO Value
 executeScriptAsync ses script = run . W.executeScriptAsync ses script
+
+getAllCookies :: SessionId -> IO [W.Cookie]
+getAllCookies = run . W.getAllCookies
+
+getNamedCookie :: SessionId -> Text -> IO W.Cookie
+getNamedCookie s = run . W.getNamedCookie s
+
+addCookie :: SessionId -> W.Cookie -> IO ()
+addCookie s = run . W.addCookie s
+
+deleteCookie :: SessionId -> Text -> IO ()
+deleteCookie s = run . W.deleteCookie s
+
+deleteAllCookies :: SessionId -> IO ()
+deleteAllCookies = run . W.deleteAllCookies
 
 -- ############# Utils #############
 

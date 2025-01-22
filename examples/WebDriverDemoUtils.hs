@@ -1,7 +1,6 @@
 module WebDriverDemoUtils where
 
 import WebDriverSpec (Selector (CSS))
-import GHC.RTS.Flags (TraceFlags(user))
 
 
 -- ################### Effectful Demo ##################
@@ -29,9 +28,6 @@ divCss = CSS "div"
 
 midFrameTitle :: Selector
 midFrameTitle = CSS "#content"
-
-myTextCss:: Selector
-myTextCss = CSS "[name='my-text']"
 
 userNameCss :: Selector
 userNameCss = CSS "#username"

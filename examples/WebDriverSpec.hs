@@ -72,7 +72,11 @@ module WebDriverSpec
     getNamedCookie,
     addCookie,
     deleteCookie,
-    deleteAllCookies
+    deleteAllCookies,
+    dismissAlert,
+    acceptAlert,
+    getAlertText,
+    sendAlertText
   )
 where
 
@@ -570,9 +574,20 @@ deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId 
 -- DELETE 	/session/{session id}/actions 	Release Actions
 
 -- POST 	/session/{session id}/alert/dismiss 	Dismiss Alert
+dismissAlert :: SessionId -> W3Spec ()
+dismissAlert sessionId = PostEmpty "Dismiss Alert" (sessionUri2 sessionId "alert" "dismiss") voidParser
+
 -- POST 	/session/{session id}/alert/accept 	Accept Alert
+acceptAlert :: SessionId -> W3Spec ()
+acceptAlert sessionId = PostEmpty "Accept Alert" (sessionUri2 sessionId "alert" "accept") voidParser
+
 -- GET 	/session/{session id}/alert/text 	Get Alert Text
+getAlertText :: SessionId -> W3Spec Text
+getAlertText sessionId = Get "Get Alert Text" (sessionUri2 sessionId "alert" "text") parseBodyTxt
+
 -- POST 	/session/{session id}/alert/text 	Send Alert Text
+sendAlertText :: SessionId -> Text -> W3Spec ()
+sendAlertText sessionId text = Post "Send Alert Text" (sessionUri1 sessionId "alert/text") (object ["text" .= text]) voidParser
 
 -- GET 	/session/{session id}/screenshot 	Take Screenshot
 takeScreenshot :: SessionId -> W3Spec Text

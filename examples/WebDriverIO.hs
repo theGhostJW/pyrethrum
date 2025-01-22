@@ -65,7 +65,11 @@ module WebDriverIO
     getNamedCookie,
     addCookie,
     deleteCookie,
-    deleteAllCookies
+    deleteAllCookies,
+    dismissAlert,
+    acceptAlert,
+    getAlertText,
+    sendAlertText
   )
 where
 
@@ -272,6 +276,18 @@ deleteCookie s = run . W.deleteCookie s
 
 deleteAllCookies :: SessionId -> IO ()
 deleteAllCookies = run . W.deleteAllCookies
+
+dismissAlert :: SessionId -> IO ()
+dismissAlert = run . W.dismissAlert
+
+acceptAlert:: SessionId -> IO ()
+acceptAlert = run . W.acceptAlert
+
+getAlertText :: SessionId -> IO Text
+getAlertText = run . W.getAlertText
+
+sendAlertText :: SessionId -> Text -> IO ()
+sendAlertText s = run . W.sendAlertText s
 
 -- ############# Utils #############
 

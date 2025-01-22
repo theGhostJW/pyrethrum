@@ -24,15 +24,22 @@ import WebDriverDemoUtils
     userNameCss,
   )
 import WebDriverIO
-  ( FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
+  ( Cookie (..),
+    FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
+    SameSite (..),
+    Selector (..),
     SessionId,
     Timeouts (..),
     WindowHandle (..),
     WindowRect (..),
-    SameSite (..),
+    acceptAlert,
+    addCookie,
     back,
     closeWindow,
+    deleteAllCookies,
+    deleteCookie,
     deleteSession,
+    dismissAlert,
     elementClear,
     elementClick,
     elementSendKeys,
@@ -47,6 +54,7 @@ import WebDriverIO
     forward,
     fullScreenWindow,
     getActiveElement,
+    getAlertText,
     getAllCookies,
     getCurrentUrl,
     getElementAttribute,
@@ -54,8 +62,11 @@ import WebDriverIO
     getElementComputedRole,
     getElementCssValue,
     getElementProperty,
+    getElementRect,
+    getElementShadowRoot,
     getElementTagName,
     getElementText,
+    getNamedCookie,
     getPageSource,
     getTimeouts,
     getTitle,
@@ -71,6 +82,7 @@ import WebDriverIO
     newWindow,
     printPage,
     refresh,
+    sendAlertText,
     setTimeouts,
     setWindowRect,
     sleepMs,
@@ -79,7 +91,7 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     takeElementScreenshot,
-    takeScreenshot, Cookie (..), getElementRect, Selector (..), getElementShadowRoot, getNamedCookie, addCookie, deleteCookie, deleteAllCookies,
+    takeScreenshot,
   )
 import WebDriverPure (seconds)
 
@@ -160,7 +172,6 @@ demoForwardBackRefresh = do
   logM "current url" $ getCurrentUrl ses
   logM "title" $ getTitle ses
   logTxt "refreshing"
-
   refresh ses
   sleep1
 
@@ -445,18 +456,19 @@ demoCookies = do
   logShowM "cookies" $ getAllCookies ses
 
   logShowM "getNamedCookie: optimizelyEndUserId" $ getNamedCookie ses "optimizelyEndUserId"
-  
-  let myCookie = Cookie
-        { name = "myCookie",
-          value = "myCookieValue",
-          path = Just "/",
-          domain = Just "the-internet.herokuapp.com",
-          secure = Just True,
-          sameSite = Just Strict,
-          httpOnly = Just False,
-          expiry = Just 2772072677
-        }
-  
+
+  let myCookie =
+        Cookie
+          { name = "myCookie",
+            value = "myCookieValue",
+            path = Just "/",
+            domain = Just "the-internet.herokuapp.com",
+            secure = Just True,
+            sameSite = Just Strict,
+            httpOnly = Just False,
+            expiry = Just 2772072677
+          }
+
   logShow "cookie to add" myCookie
   logShowM "addCookie" $ addCookie ses myCookie
   logShowM "cookies after add" $ getAllCookies ses
@@ -468,7 +480,56 @@ demoCookies = do
   logShowM "cookies after delete all" $ getAllCookies ses
   deleteSession ses
 
+-- >>> demoAlerts
+-- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
+--   path                 = "/session/2219f818-ce66-4051-ba6a-ae71d2ad50ad/alert%2Ftext"
+--   queryString          = ""
+--   method               = "POST"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+--  (StatusCodeException (Response {responseStatus = Status {statusCode = 405, statusMessage = "Method Not Allowed"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","text/plain; charset=utf-8"),("content-length","23"),("date","Wed, 22 Jan 2025 03:31:50 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
+--   path                 = "/session/2219f818-ce66-4051-ba6a-ae71d2ad50ad/alert%2Ftext"
+--   queryString          = ""
+--   method               = "POST"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+-- , responseEarlyHints = []}) "HTTP method not allowed"))
+demoAlerts :: IO ()
+demoAlerts = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  sendAlertText ses "Hello from Pyrethrum!"
+  sleep2
 
+  acceptAlert ses
+  sleep1
+
+  sendAlertText ses "Hello from Pyrethrum again!"
+  logShowM "get alert text" $ getAlertText ses
+  sleep2
+
+  dismissAlert ses
+  sleep1
+
+  deleteSession ses
 
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do

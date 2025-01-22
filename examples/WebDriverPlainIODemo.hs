@@ -3,6 +3,7 @@ module WebDriverPlainIODemo where
 import Data.Aeson (Value (..))
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
+import BasePrelude qualified
 import WebDriverDemoUtils
   ( anyElmCss,
     bottomFrameCss,
@@ -21,7 +22,7 @@ import WebDriverDemoUtils
     shadowDomUrl,
     theInternet,
     topFrameCSS,
-    userNameCss,
+    userNameCss, alertsUrl, jsAlertXPath, jsPromptXPath
   )
 import WebDriverIO
   ( Cookie (..),
@@ -481,54 +482,31 @@ demoCookies = do
   deleteSession ses
 
 -- >>> demoAlerts
--- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/2219f818-ce66-4051-ba6a-ae71d2ad50ad/alert%2Ftext"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 405, statusMessage = "Method Not Allowed"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","text/plain; charset=utf-8"),("content-length","23"),("date","Wed, 22 Jan 2025 03:31:50 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/2219f818-ce66-4051-ba6a-ae71d2ad50ad/alert%2Ftext"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "HTTP method not allowed"))
 demoAlerts :: IO ()
 demoAlerts = do
   ses <- mkExtendedTimeoutsSession
-  navigateTo ses theInternet
-  sendAlertText ses "Hello from Pyrethrum!"
+  navigateTo ses alertsUrl
+  
+  alert <- findElement ses jsAlertXPath
+  elementClick ses alert
+
   sleep2
-
-  acceptAlert ses
-  sleep1
-
-  sendAlertText ses "Hello from Pyrethrum again!"
   logShowM "get alert text" $ getAlertText ses
+
   sleep2
+  logShowM "acceptAlert" $ acceptAlert ses
 
-  dismissAlert ses
   sleep1
+  prompt <- findElement ses jsPromptXPath
+  elementClick ses prompt
 
+  sleep1
+  logShowM "sendAlertText: I am Dave" $ sendAlertText ses "I am Dave"
+
+  sleep2
+  dismissAlert ses
+
+  sleep1
   deleteSession ses
 
 mkExtendedTimeoutsSession :: IO SessionId

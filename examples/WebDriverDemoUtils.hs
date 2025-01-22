@@ -1,12 +1,15 @@
 module WebDriverDemoUtils where
 
-import WebDriverSpec (Selector (CSS))
+import WebDriverSpec (Selector (CSS, XPath))
 
 
 -- ################### Effectful Demo ##################
 
 theInternet :: Text
 theInternet = "https://the-internet.herokuapp.com/"
+
+alertsUrl :: Text
+alertsUrl = "https://the-internet.herokuapp.com/javascript_alerts"
 
 checkBoxesLinkCss :: Selector
 checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
@@ -22,6 +25,12 @@ midFrameCss = CSS "frame[name='frame-middle']"
 
 bottomFrameCss :: Selector
 bottomFrameCss = CSS "frame[name='frame-bottom']"
+
+jsAlertXPath  :: Selector
+jsAlertXPath  = XPath "//button[text()='Click for JS Alert']"
+
+jsPromptXPath :: Selector
+jsPromptXPath = XPath "//button[text()='Click for JS Prompt']"
 
 divCss :: Selector
 divCss = CSS "div"

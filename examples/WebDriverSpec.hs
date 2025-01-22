@@ -76,7 +76,7 @@ module WebDriverSpec
     dismissAlert,
     acceptAlert,
     getAlertText,
-    sendAlertText
+    sendAlertText,
   )
 where
 
@@ -91,9 +91,9 @@ import Data.Aeson
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
+import Data.Text (pack)
 import PyrethrumExtras (toS)
 import Prelude hiding (get)
-import Data.Text (pack)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -225,11 +225,16 @@ instance ToJSON Cookie where
           ]
 
 cookieJSON :: Cookie -> Value
-cookieJSON c = object [ "cookie" .= c ]
+cookieJSON c = object ["cookie" .= c]
 
 -- TODO: add more selector types
-newtype Selector = CSS Text
-  deriving (Show)
+data Selector
+  = CSS Text
+  | XPath Text
+  | LinkText Text
+  | PartialLinkText Text
+  | TagName Text
+  deriving (Show, Eq)
 
 -- TODO capabilities for all browsers - to annewSessionSpec'd from JSON
 -- move to separate module added typed definition to all APIs that require
@@ -587,7 +592,7 @@ getAlertText sessionId = Get "Get Alert Text" (sessionUri2 sessionId "alert" "te
 
 -- POST 	/session/{session id}/alert/text 	Send Alert Text
 sendAlertText :: SessionId -> Text -> W3Spec ()
-sendAlertText sessionId text = Post "Send Alert Text" (sessionUri1 sessionId "alert/text") (object ["text" .= text]) voidParser
+sendAlertText sessionId text = Post "Send Alert Text" (sessionUri2 sessionId "alert" "text") (object ["text" .= text]) voidParser
 
 -- GET 	/session/{session id}/screenshot 	Take Screenshot
 takeScreenshot :: SessionId -> W3Spec Text
@@ -613,7 +618,7 @@ data WindowRect = Rect
     height :: Int
   }
   deriving (Show, Eq)
-  
+
 instance ToJSON WindowRect where
   toJSON :: WindowRect -> Value
   toJSON Rect {x, y, width, height} =
@@ -623,7 +628,7 @@ instance ToJSON WindowRect where
         "width" .= width,
         "height" .= height
       ]
-      
+
 parseWindowRect :: HttpResponse -> Maybe WindowRect
 parseWindowRect r =
   Rect
@@ -636,7 +641,6 @@ parseWindowRect r =
 
 mkScript :: Text -> [Value] -> Value
 mkScript script args = object ["script" .= script, "args" .= args]
-
 
 data Timeouts = Timeouts
   { implicit :: Int,
@@ -661,7 +665,6 @@ windowHandleFromValue :: Value -> Maybe WindowHandle
 windowHandleFromValue v =
   liftA2 Handle (lookupTxt "handle" v) (lookupTxt "type" v)
 
-
 parseCookies :: HttpResponse -> Maybe [Cookie]
 parseCookies r =
   bodyValue r
@@ -676,16 +679,15 @@ parseCookie r =
 
 cookieFromBody :: Value -> Maybe Cookie
 cookieFromBody b = do
-    name <- lookupTxt "name" b
-    value <- lookupTxt "value" b
-    let 
-      path = lookupTxt "path" b
+  name <- lookupTxt "name" b
+  value <- lookupTxt "value" b
+  let path = lookupTxt "path" b
       domain = lookupTxt "domain" b
       secure = lookupBool "secure" b
       httpOnly = lookupBool "httpOnly" b
       sameSite = lookupSameSite "sameSite" b
       expiry = lookupInt "expiry" b
-    pure $ Cookie {..}
+  pure $ Cookie {..}
 
 parseTimeouts :: HttpResponse -> Maybe Timeouts
 parseTimeouts r =
@@ -699,7 +701,13 @@ parseTimeouts r =
 
 selectorJson :: Selector -> Value
 selectorJson = \case
-  CSS css -> object ["using" .= ("css selector" :: Text), "value" .= css]
+  CSS css -> sJSON "css selector" css
+  XPath xpath -> sJSON "xpath" xpath
+  LinkText lt -> sJSON "link text" lt
+  PartialLinkText plt -> sJSON "partial link text" plt
+  TagName tn -> sJSON "tag name" tn
+  where
+    sJSON using value = object ["using" .= using, "value" .= value]
 
 voidParser :: HttpResponse -> Maybe ()
 voidParser _ = Just ()
@@ -708,7 +716,7 @@ bodyText' :: Maybe Value -> Key -> Maybe Text
 bodyText' v k = v >>= lookupTxt k
 
 bodyText :: HttpResponse -> Key -> Maybe Text
-bodyText r = bodyText' (bodyValue r) 
+bodyText r = bodyText' (bodyValue r)
 
 bodyInt' :: Maybe Value -> Key -> Maybe Int
 bodyInt' v k = v >>= lookupInt k
@@ -720,9 +728,10 @@ parseBodyTxt :: HttpResponse -> Maybe Text
 parseBodyTxt r = bodyValue r >>= asText
 
 parseBodyBool :: HttpResponse -> Maybe Bool
-parseBodyBool r = bodyValue r >>= \case
-  Bool b -> Just b
-  _ -> Nothing
+parseBodyBool r =
+  bodyValue r >>= \case
+    Bool b -> Just b
+    _ -> Nothing
 
 parseElementsRef :: HttpResponse -> Maybe [ElementId]
 parseElementsRef r =
@@ -741,16 +750,18 @@ lookupTxt :: Key -> Value -> Maybe Text
 lookupTxt k v = lookup k v >>= asText
 
 lookupBool :: Key -> Value -> Maybe Bool
-lookupBool k v = lookup k v >>= \case
-  Bool b -> Just b
-  _ -> Nothing
+lookupBool k v =
+  lookup k v >>= \case
+    Bool b -> Just b
+    _ -> Nothing
 
 lookupSameSite :: Key -> Value -> Maybe SameSite
-lookupSameSite k v = lookup k v >>= \case
-  String "Lax" -> Just Lax
-  String "Strict" -> Just Strict
-  String "None" -> Just None
-  _ -> Nothing
+lookupSameSite k v =
+  lookup k v >>= \case
+    String "Lax" -> Just Lax
+    String "Strict" -> Just Strict
+    String "None" -> Just None
+    _ -> Nothing
 
 lookupInt :: Key -> Value -> Maybe Int
 lookupInt k v = lookup k v >>= asInt
@@ -784,12 +795,10 @@ shadowRootFieldName = "shadow-6066-11e4-a52e-4f735466cecf"
 parseElementRef :: HttpResponse -> Maybe ElementId
 parseElementRef r =
   Element <$> bodyText r elementFieldName
-        
 
 parseShadowElementRef :: HttpResponse -> Maybe ElementId
 parseShadowElementRef r =
   Element <$> bodyText r shadowRootFieldName
-
 
 elemtRefFromBody :: Value -> Maybe ElementId
 elemtRefFromBody b = Element <$> lookupTxt elementFieldName b

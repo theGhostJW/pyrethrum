@@ -64,7 +64,9 @@ module WebDriverSpec
     getPageSource,
     takeScreenshot,
     takeElementScreenshot,
-    printPage
+    printPage,
+    executeScript,
+    executeScriptAsync
   )
 where
 
@@ -507,14 +509,22 @@ getPageSource :: SessionId -> W3Spec Text
 getPageSource sessionId = Get "Get Page Source" (sessionUri1 sessionId "source") parseBodyTxt
 
 -- POST 	/session/{session id}/execute/sync 	Execute Script
+executeScript :: SessionId -> Text -> [Value] -> W3Spec Value
+executeScript sessionId script args = Post "Execute Script" (sessionUri2 sessionId "execute" "sync") (mkScript script args) bodyValue
+
 -- POST 	/session/{session id}/execute/async 	Execute Async Script
+executeScriptAsync :: SessionId -> Text -> [Value] -> W3Spec Value
+executeScriptAsync sessionId script args = Post "Execute Async Script" (sessionUri2 sessionId "execute" "async") (mkScript script args) bodyValue
+
 -- GET 	/session/{session id}/cookie 	Get All Cookies
 -- GET 	/session/{session id}/cookie/{name} 	Get Named Cookie
 -- POST 	/session/{session id}/cookie 	Add Cookie
 -- DELETE 	/session/{session id}/cookie/{name} 	Delete Cookie
 -- DELETE 	/session/{session id}/cookie 	Delete All Cookies
+
 -- POST 	/session/{session id}/actions 	Perform Actions
 -- DELETE 	/session/{session id}/actions 	Release Actions
+
 -- POST 	/session/{session id}/alert/dismiss 	Dismiss Alert
 -- POST 	/session/{session id}/alert/accept 	Accept Alert
 -- GET 	/session/{session id}/alert/text 	Get Alert Text
@@ -564,6 +574,9 @@ parseWindowRect r =
     <*> bdyInt "height"
   where
     bdyInt = bodyInt r
+
+mkScript :: Text -> [Value] -> Value
+mkScript script args = object ["script" .= script, "args" .= args]
 
 
 data Timeouts = Timeouts

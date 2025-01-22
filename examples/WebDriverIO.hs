@@ -55,7 +55,9 @@ module WebDriverIO
     printPage,
     getPageSource,
     takeScreenshot,
-    takeElementScreenshot
+    takeElementScreenshot,
+    executeScript,
+    executeScriptAsync
   )
 where
 
@@ -242,6 +244,11 @@ takeElementScreenshot s = run . W.takeElementScreenshot s
 printPage :: SessionId -> IO Text
 printPage = run . W.printPage
 
+executeScript :: SessionId -> Text -> [Value] -> IO Value
+executeScript ses script = run . W.executeScript ses script
+
+executeScriptAsync :: SessionId -> Text -> [Value] -> IO Value
+executeScriptAsync ses script = run . W.executeScriptAsync ses script
 
 -- ############# Utils #############
 

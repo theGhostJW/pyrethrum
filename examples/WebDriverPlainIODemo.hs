@@ -1,5 +1,6 @@
 module WebDriverPlainIODemo where
 
+import Data.Aeson (Value (..))
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
 import WebDriverDemoUtils
@@ -32,7 +33,11 @@ import WebDriverIO
     back,
     closeWindow,
     deleteSession,
+    elementClear,
     elementClick,
+    elementSendKeys,
+    executeScript,
+    executeScriptAsync,
     findElement,
     findElementFromElement,
     findElementFromShadowRoot,
@@ -52,6 +57,7 @@ import WebDriverIO
     getElementShadowRoot,
     getElementTagName,
     getElementText,
+    getPageSource,
     getTimeouts,
     getTitle,
     getWindowHandle,
@@ -73,8 +79,8 @@ import WebDriverIO
     switchToFrame,
     switchToParentFrame,
     switchToWindow,
-    elementClear,
-    elementSendKeys, getPageSource, takeScreenshot, takeElementScreenshot
+    takeElementScreenshot,
+    takeScreenshot,
   )
 import WebDriverPure (seconds)
 import WebDriverSpec (Selector (..))
@@ -107,7 +113,6 @@ demoSessionDriverStatus = do
   log "new session" $ txt ses
   logShowM "driver status" status
   deleteSession ses
-
 
 -- >>> demoSendKeysClear
 demoSendKeysClear :: IO ()
@@ -421,6 +426,18 @@ demoPrintPage = do
   logM "print page" $ printPage ses
   deleteSession ses
 
+--- >>> demoExecuteScript
+demoExecuteScript :: IO ()
+demoExecuteScript = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  logShowM "executeScript" $ executeScript ses "return arguments[0];" [String "Hello from Pyrethrum!", Number 2000]
+  sleep2
+  logTxt "executing asynch alert"
+  executeScriptAsync ses "setTimeout(() => alert('Hello from Pyrethrum!'), 2000); return 5;" []
+  logTxt "after asynch alert"
+  sleep2
+  deleteSession ses
 
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do

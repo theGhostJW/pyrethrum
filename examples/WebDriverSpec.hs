@@ -94,6 +94,7 @@ import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Text (pack)
 import PyrethrumExtras (toS)
 import Prelude hiding (get)
+import Web.Api.WebDriver (InputSource)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -181,7 +182,15 @@ data FrameReference
   = TopLevelFrame
   | FrameNumber Word16
   | FrameElementId ElementId
-  deriving (Show)
+  deriving (Show, Eq)
+
+-- https://www.w3.org/TR/webdriver2/#processing-actions
+data InputSource = 
+  Pause |
+  Key |
+  Pointer |
+  Wheel 
+  deriving (Show, Eq)
 
 frameJson :: FrameReference -> Value
 frameJson fr =

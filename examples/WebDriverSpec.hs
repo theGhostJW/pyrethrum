@@ -91,10 +91,9 @@ import Data.Aeson
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
-import Data.Text (pack)
+import Data.Text (pack, toLower)
 import PyrethrumExtras (toS)
 import Prelude hiding (get)
-import Web.Api.WebDriver (InputSource)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -182,14 +181,6 @@ data FrameReference
   = TopLevelFrame
   | FrameNumber Word16
   | FrameElementId ElementId
-  deriving (Show, Eq)
-
--- https://www.w3.org/TR/webdriver2/#processing-actions
-data InputSource = 
-  Pause |
-  Key |
-  Pointer |
-  Wheel 
   deriving (Show, Eq)
 
 frameJson :: FrameReference -> Value
@@ -859,3 +850,122 @@ parseDriverStatus Response {statusCode, statusMessage} =
 
 keysJson :: Text -> Value
 keysJson keysToSend = object ["text" .= keysToSend]
+
+-- actions
+
+type Actions = [Action]
+
+
+data KeyAction = KeyDown | KeyUp 
+  deriving (Show, Eq)
+
+data Action
+  = NoneAction (Maybe Int) -- duration in milliseconds (pause)
+  | Key {
+    action :: KeyAction,
+    value :: Set Char 
+    -- https://github.com/jlipps/simple-wd-spec?tab=readme-ov-file#perform-actions
+    -- keys codepoint https://www.w3.org/TR/webdriver2/#keyboard-actions
+  }
+  | Pointer { subType :: PointerType
+            , action :: PointerAction
+            , pointerId :: Int -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers. 
+            , pressed   :: Set Int -- pressed buttons
+            , x         :: Int
+            , y         :: Int
+            }
+  | ActionWheel WheelActionType
+  deriving (Show, Eq)
+
+-- Pointer subtypes 
+data PointerType
+  = Mouse
+  | Pen
+  | Touch
+  deriving (Show, Eq)
+
+data PointerAction
+  = PointerUp { button :: Int } -- button
+  | PointerDown { button :: Int } -- button
+  | PointerMove { duration :: Maybe Int, x:: Int, y:: Int }
+
+
+-- Pointer input source
+data PointerInputSource = PointerInputSource
+ 
+  deriving (Show, Eq)
+-- High-level input source types
+data InputSourceType
+  = SourceNone
+  | SourceKey
+  | SourcePointer
+  | SourceWheel
+  deriving (Show, Eq)
+
+
+
+-- Wheel input source
+data WheelInputSource = WheelInputSource
+  deriving (Show, Eq)
+
+-- Unified InputSource
+data InputSource
+  = ISNull    NullInputSource
+  | ISKey     KeyInputSource
+  | ISPointer PointerInputSource
+  | ISWheel   WheelInputSource
+  deriving (Show, Eq)
+
+--------------------------------------------------------------------------------
+-- Actions
+--------------------------------------------------------------------------------
+
+-- Actions for each source type
+
+data PointerActionType
+  = PointerDown
+      { paButton  :: Int
+      , paWidth   :: Maybe Double
+      , paHeight  :: Maybe Double
+      }
+  | PointerUp
+      { paButton  :: Int
+      , paWidth   :: Maybe Double
+      , paHeight  :: Maybe Double
+      }
+  | PointerMove
+      { pmDuration :: Maybe Int
+      , pmX        :: Int
+      , pmY        :: Int
+      , pmOrigin   :: String
+      }
+  | PointerCancel
+  | PointerPause (Maybe Int)
+  deriving (Show, Eq)
+
+data WheelActionType
+  = WheelScroll
+      { wsDuration :: Maybe Int
+      , wsX        :: Int
+      , wsY        :: Int
+      , wsDeltaX   :: Int
+      , wsDeltaY   :: Int
+      , wsOrigin   :: String
+      }
+  | WheelPause (Maybe Int)
+  deriving (Show, Eq)
+
+-- Unified action item
+
+
+--------------------------------------------------------------------------------
+-- Input State
+--------------------------------------------------------------------------------
+
+data InputState = InputState
+  { isSources       :: [(String, InputSource)]  -- map of inputId -> source
+  , isCancelList    :: [ActionItem]             -- actions to undo on Release
+  }
+  deriving (Show, Eq)
+
+-- ...existing code...

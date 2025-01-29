@@ -77,10 +77,12 @@ module WebDriverSpec
     acceptAlert,
     getAlertText,
     sendAlertText,
+    performActions,
+    releaseActions
   )
 where
 
-import BasePrelude (Show (..))
+import BasePrelude qualified as BP
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
@@ -91,9 +93,8 @@ import Data.Aeson
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
-import Data.Text (pack, toLower)
 import PyrethrumExtras (toS)
-import Prelude hiding (get)
+import Prelude hiding (get, Down)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -175,7 +176,7 @@ data SameSite
 
 instance ToJSON SameSite where
   toJSON :: SameSite -> Value
-  toJSON = String . pack . BasePrelude.show
+  toJSON = String . show
 
 data FrameReference
   = TopLevelFrame
@@ -576,8 +577,8 @@ deleteAllCookies :: SessionId -> W3Spec ()
 deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId "cookie") voidParser
 
 -- POST 	/session/{session id}/actions 	Perform Actions
-performActions :: SessionId -> Value -> W3Spec ()
-performActions sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") actions voidParser
+performActions :: SessionId -> Actions -> W3Spec ()
+performActions sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") (actionsToJson actions) voidParser
 
 -- DELETE 	/session/{session id}/actions 	Release Actions
 releaseActions :: SessionId -> W3Spec ()
@@ -853,119 +854,131 @@ keysJson keysToSend = object ["text" .= keysToSend]
 
 -- actions
 
-type Actions = [Action]
+type Actions = [[Action]]
 
+actionsToJson :: Actions -> Value
+actionsToJson = Array . fromList . fmap (Array . fromList . fmap toJSON)
 
-data KeyAction = KeyDown | KeyUp 
+data KeyAction = KeyDown | KeyUp
   deriving (Show, Eq)
 
-data Action
-  = NoneAction (Maybe Int) -- duration in milliseconds (pause)
-  | Key {
-    action :: KeyAction,
-    value :: Set Char 
-    -- https://github.com/jlipps/simple-wd-spec?tab=readme-ov-file#perform-actions
-    -- keys codepoint https://www.w3.org/TR/webdriver2/#keyboard-actions
-  }
-  | Pointer { subType :: PointerType
-            , action :: PointerAction
-            , pointerId :: Int -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers. 
-            , pressed   :: Set Int -- pressed buttons
-            , x         :: Int
-            , y         :: Int
-            }
-  | ActionWheel WheelActionType
-  deriving (Show, Eq)
-
--- Pointer subtypes 
-data PointerType
+-- Pointer subtypes
+data Pointer
   = Mouse
   | Pen
   | Touch
   deriving (Show, Eq)
 
+data PointerOrigin
+  = Viewport
+  | OriginPointer
+  | OriginElement ElementId
+  deriving (Show, Eq)
+
+-- https://www.w3.org/TR/webdriver2/#pointer-input-source
 data PointerAction
-  = PointerUp { button :: Int } -- button
-  | PointerDown { button :: Int } -- button
-  | PointerMove { duration :: Maybe Int, x:: Int, y:: Int }
-
-
--- Pointer input source
-data PointerInputSource = PointerInputSource
- 
-  deriving (Show, Eq)
--- High-level input source types
-data InputSourceType
-  = SourceNone
-  | SourceKey
-  | SourcePointer
-  | SourceWheel
-  deriving (Show, Eq)
-
-
-
--- Wheel input source
-data WheelInputSource = WheelInputSource
-  deriving (Show, Eq)
-
--- Unified InputSource
-data InputSource
-  = ISNull    NullInputSource
-  | ISKey     KeyInputSource
-  | ISPointer PointerInputSource
-  | ISWheel   WheelInputSource
-  deriving (Show, Eq)
-
---------------------------------------------------------------------------------
--- Actions
---------------------------------------------------------------------------------
-
--- Actions for each source type
-
-data PointerActionType
-  = PointerDown
-      { paButton  :: Int
-      , paWidth   :: Maybe Double
-      , paHeight  :: Maybe Double
+  = Up {button :: Int} -- button
+  | Down {button :: Int} -- button
+  | Move
+      { origin :: PointerOrigin,
+        duration :: Maybe Int, -- ms
+        -- where to move to
+        x :: Int,
+        y :: Int
       }
-  | PointerUp
-      { paButton  :: Int
-      , paWidth   :: Maybe Double
-      , paHeight  :: Maybe Double
-      }
-  | PointerMove
-      { pmDuration :: Maybe Int
-      , pmX        :: Int
-      , pmY        :: Int
-      , pmOrigin   :: String
-      }
-  | PointerCancel
-  | PointerPause (Maybe Int)
+  | Cancel
   deriving (Show, Eq)
 
-data WheelActionType
-  = WheelScroll
-      { wsDuration :: Maybe Int
-      , wsX        :: Int
-      , wsY        :: Int
-      , wsDeltaX   :: Int
-      , wsDeltaY   :: Int
-      , wsOrigin   :: String
+
+-- TODO fix me
+instance ToJSON PointerAction where
+  toJSON :: PointerAction -> Value
+  toJSON = \case
+    Up b -> object ["type" .= ("pointerUp" :: Text), "button" .= b]
+    Down b -> object ["type" .= ("pointerDown" :: Text), "button" .= b]
+    Move {origin, duration, x, y} ->
+      object
+        [ "type" .= ("pointerMove" :: Text),
+          "origin" .= show origin,
+          "duration" .= duration,
+          "x" .= x,
+          "y" .= y
+        ]
+    Cancel -> object ["type" .= ("pointerCancel" :: Text)]
+
+data Action
+  = NoneAction (Maybe Int) -- duration in milliseconds (pause)
+  | Key
+      { keyAction :: KeyAction,
+        alt :: Bool,
+        ctrl :: Bool,
+        meta :: Bool,
+        shift :: Bool,
+        value :: Set Char
+        -- https://github.com/jlipps/simple-wd-spec?tab=readme-ov-file#perform-actions
+        -- keys codepoint https://www.w3.org/TR/webdriver2/#keyboard-actions
       }
-  | WheelPause (Maybe Int)
+  | Pointer
+      { subType :: Pointer,
+        pointerAction :: PointerAction,
+        pointerId :: Int, -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers.
+        pressed :: Set Int, -- pressed buttons
+        x :: Int, --  x location in viewport coordinates.
+        y :: Int -- y location in viewport coordinates
+      }
+  | Wheel
+      { duration :: Maybe Int,
+        x :: Int,
+        y :: Int,
+        deltaX :: Int,
+        deltay :: Int,
+        scrollOrigin :: String
+      }
   deriving (Show, Eq)
 
--- Unified action item
+-- TODO:: fix me
+instance ToJSON Action where
+  toJSON :: Action -> Value
+  toJSON = \case
+      NoneAction d -> object ["type" .= ("none" :: Text), "duration" .= d]
+      Key {keyAction, alt, ctrl, meta, shift, value} ->
+        object
+          [ "type" .= ("key" :: Text),
+            "actions" .=
+              object
+                [ "type" .= show keyAction,
+                  "alt" .= alt,
+                  "ctrl" .= ctrl,
+                  "meta" .= meta,
+                  "shift" .= shift,
+                  "value" .= value
+                ]
+          ]
+      Pointer {subType, pointerAction, pointerId, pressed, x, y} ->
+        object
+          [ "type" .= ("pointer" :: Text),
+            "actions" .=
+              object
+                [ "type" .= show subType,
+                  "actions" .= pointerAction,
+                  "pointerId" .= pointerId,
+                  "pressed" .= pressed,
+                  "x" .= x,
+                  "y" .= y
+                ]
+          ]
+      Wheel {duration, x, y, deltaX, deltay, scrollOrigin} ->
+        object
+          [ "type" .= ("wheel" :: Text),
+            "actions" .=
+              object
+                [ "duration" .= duration,
+                  "x" .= x,
+                  "y" .= y,
+                  "deltaX" .= deltaX,
+                  "deltaY" .= deltay,
+                  "origin" .= scrollOrigin
+                ]
+          ]
 
 
---------------------------------------------------------------------------------
--- Input State
---------------------------------------------------------------------------------
-
-data InputState = InputState
-  { isSources       :: [(String, InputSource)]  -- map of inputId -> source
-  , isCancelList    :: [ActionItem]             -- actions to undo on Release
-  }
-  deriving (Show, Eq)
-
--- ...existing code...

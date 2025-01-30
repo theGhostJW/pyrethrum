@@ -13,6 +13,13 @@ module WebDriverSpec
     WindowHandle (..),
     FrameReference (..),
     WindowRect (..),
+    --- actions
+    PointerOrigin(..),
+    Action(..),
+    Actions(..),
+    KeyAction(..),
+    Pointer(..),
+    PointerAction(..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -95,6 +102,7 @@ import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
 import PyrethrumExtras (toS)
 import Prelude hiding (get, Down)
+import Data.Text qualified as T
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -155,7 +163,7 @@ data WindowHandle = Handle
   deriving (Show, Eq)
 
 newtype ElementId = Element {id :: Text}
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 newtype SessionId = Session {id :: Text}
   deriving (Show)
@@ -854,13 +862,44 @@ keysJson keysToSend = object ["text" .= keysToSend]
 
 -- actions
 
-type Actions = [[Action]]
+newtype Actions = MkActions {actions :: [[Action]]}
 
 actionsToJson :: Actions -> Value
-actionsToJson = Array . fromList . fmap (Array . fromList . fmap toJSON)
+actionsToJson = Array . fromList . fmap (Array . fromList . fmap toJSON) . (.actions) 
 
+{-
+
+[
+  [
+    {
+      "actions": {
+        "actions": {
+          "duration": 4000,
+          "origin": "viewport",
+          "type": "pointerMove",
+          "x": 150,
+          "y": 150
+        },
+        "pointerId": 0,
+        "pressed": [],
+        "type": "mouse",
+        "x": 0,
+        "y": 0
+      },
+      "type": "pointer"
+    }
+  ]
+]
+
+-}
 data KeyAction = KeyDown | KeyUp
   deriving (Show, Eq)
+
+instance ToJSON KeyAction where
+  toJSON :: KeyAction -> Value
+  toJSON = \case
+    KeyDown -> "keyDown"
+    KeyUp -> "keyUp"
 
 -- Pointer subtypes
 data Pointer
@@ -869,11 +908,26 @@ data Pointer
   | Touch
   deriving (Show, Eq)
 
+mkLwrString :: Show a => a -> Value
+mkLwrString = String . T.toLower . show
+
+instance ToJSON Pointer where
+  toJSON :: Pointer -> Value
+  toJSON = mkLwrString
+
 data PointerOrigin
   = Viewport
   | OriginPointer
   | OriginElement ElementId
   deriving (Show, Eq)
+
+instance ToJSON PointerOrigin where
+  toJSON :: PointerOrigin -> Value
+  toJSON = \case
+    Viewport -> "viewport"
+    OriginPointer -> "pointer"
+    OriginElement (Element id') -> object ["element" .= id']
+
 
 -- https://www.w3.org/TR/webdriver2/#pointer-input-source
 data PointerAction
@@ -899,7 +953,7 @@ instance ToJSON PointerAction where
     Move {origin, duration, x, y} ->
       object
         [ "type" .= ("pointerMove" :: Text),
-          "origin" .= show origin,
+          "origin" .= origin,
           "duration" .= duration,
           "x" .= x,
           "y" .= y
@@ -959,7 +1013,7 @@ instance ToJSON Action where
           [ "type" .= ("pointer" :: Text),
             "actions" .=
               object
-                [ "type" .= show subType,
+                [ "type" .= subType,
                   "actions" .= pointerAction,
                   "pointerId" .= pointerId,
                   "pressed" .= pressed,
@@ -972,7 +1026,9 @@ instance ToJSON Action where
           [ "type" .= ("wheel" :: Text),
             "actions" .=
               object
-                [ "duration" .= duration,
+                [ 
+                  "type" .= ("scroll" :: Text),
+                  "duration" .= duration,
                   "x" .= x,
                   "y" .= y,
                   "deltaX" .= deltaX,

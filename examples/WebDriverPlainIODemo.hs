@@ -1,10 +1,12 @@
 module WebDriverPlainIODemo where
 
 import Data.Aeson (Value (..))
+import Data.Set qualified as Set
 import Data.Text.IO qualified as TIO
 import PyrethrumExtras (txt)
 import WebDriverDemoUtils
-  ( anyElmCss,
+  ( alertsUrl,
+    anyElmCss,
     bottomFrameCss,
     checkBoxesCss,
     checkBoxesLinkCss,
@@ -15,20 +17,28 @@ import WebDriverDemoUtils
     h3TagCss,
     inputTagCss,
     inputsUrl,
+    jsAlertXPath,
+    jsPromptXPath,
     loginUrl,
     midFrameCss,
     midFrameTitle,
     shadowDomUrl,
     theInternet,
     topFrameCSS,
-    userNameCss, alertsUrl, jsAlertXPath, jsPromptXPath
+    userNameCss,
   )
 import WebDriverIO
-  ( Cookie (..),
-    FrameReference (FrameElementId, FrameNumber, TopLevelFrame),
+  ( Action (..),
+    Actions (..),
+    Cookie (..),
+    FrameReference (..),
+    KeyAction (..),
+    Pointer (..),
+    PointerAction (..),
+    PointerOrigin (..),
     SameSite (..),
     Selector (..),
-    SessionId,
+    SessionId (..),
     Timeouts (..),
     WindowHandle (..),
     WindowRect (..),
@@ -80,6 +90,7 @@ import WebDriverIO
     navigateTo,
     newDefaultFirefoxSession,
     newWindow,
+    performActions,
     printPage,
     refresh,
     sendAlertText,
@@ -115,6 +126,17 @@ sleep1 = sleepMs $ 1 * seconds
 
 sleep2 :: IO ()
 sleep2 = sleepMs $ 2 * seconds
+
+mkExtendedTimeoutsSession :: IO SessionId
+mkExtendedTimeoutsSession = do
+  ses <- newDefaultFirefoxSession
+  setTimeouts ses $
+    Timeouts
+      { pageLoad = 30 * seconds,
+        script = 11 * seconds,
+        implicit = 12 * seconds
+      }
+  pure ses
 
 -- >>> demoSessionDriverStatus
 demoSessionDriverStatus :: IO ()
@@ -485,7 +507,7 @@ demoAlerts :: IO ()
 demoAlerts = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses alertsUrl
-  
+
   alert <- findElement ses jsAlertXPath
   elementClick ses alert
 
@@ -508,13 +530,62 @@ demoAlerts = do
   sleep1
   deleteSession ses
 
-mkExtendedTimeoutsSession :: IO SessionId
-mkExtendedTimeoutsSession = do
-  ses <- newDefaultFirefoxSession
-  setTimeouts ses $
-    Timeouts
-      { pageLoad = 30 * seconds,
-        script = 11 * seconds,
-        implicit = 12 * seconds
-      }
-  pure ses
+-- >>> demoActions
+-- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
+--   path                 = "/session/202bc6fe-1d9c-49b4-9107-cb3dafb7727b/actions"
+--   queryString          = ""
+--   method               = "POST"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+--  (StatusCodeException (Response {responseStatus = Status {statusCode = 400, statusMessage = "Bad Request"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","93"),("date","Thu, 30 Jan 2025 01:00:00 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
+--   host                 = "127.0.0.1"
+--   port                 = 4444
+--   secure               = False
+--   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
+--   path                 = "/session/202bc6fe-1d9c-49b4-9107-cb3dafb7727b/actions"
+--   queryString          = ""
+--   method               = "POST"
+--   proxy                = Nothing
+--   rawBody              = False
+--   redirectCount        = 10
+--   responseTimeout      = ResponseTimeoutDefault
+--   requestVersion       = HTTP/1.1
+--   proxySecureMode      = ProxySecureWithConnect
+-- }
+-- , responseEarlyHints = []}) "{\"value\":{\"error\":\"invalid argument\",\"message\":\"Body was not a JSON Object\",\"stacktrace\":\"\"}}"))
+demoActions :: IO ()
+demoActions = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses theInternet
+  let actions =
+        MkActions
+          [ [ Pointer
+                { subType = Mouse,
+                  pointerAction =
+                    Move
+                      { origin = Viewport,
+                        duration = Just $ 4 * seconds,
+                        x = 150,
+                        y = 150
+                      },
+                  pointerId = 0,
+                  pressed = Set.empty,
+                  x = 0,
+                  y = 0
+                }
+            ]
+          ]
+
+  performActions ses actions
+
+  sleep2
+  deleteSession ses

@@ -9,6 +9,12 @@ module WebDriverIO
     W.FrameReference (..),
     W.WindowRect (..),
     W.Cookie (..),
+    W.PointerOrigin(..),
+    W.Action(..),
+    W.Actions(..),
+    W.KeyAction(..),
+    W.Pointer(..),
+    W.PointerAction(..),
     status,
     findElementFromElement,
     findElementsFromElement,
@@ -36,6 +42,8 @@ module WebDriverIO
     newWindow,
     newSession,
     newDefaultFirefoxSession,
+    performActions,
+    releaseActions,
     deleteSession,
     navigateTo,
     findElement,
@@ -289,13 +297,19 @@ getAlertText = run . W.getAlertText
 sendAlertText :: SessionId -> Text -> IO ()
 sendAlertText s = run . W.sendAlertText s
 
+performActions :: SessionId -> W.Actions -> IO ()
+performActions s = run . W.performActions s
+
+releaseActions :: SessionId -> IO ()
+releaseActions = run . W.releaseActions
+
 -- ############# Utils #############
 
 sleepMs :: Int -> IO ()
 sleepMs = threadDelay . (* 1_000)
 
 debug :: Bool
-debug = False
+debug = True
 
 -- no console out for "production"
 run :: (Show a) => W3Spec a -> IO a

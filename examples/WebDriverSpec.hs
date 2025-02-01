@@ -14,12 +14,12 @@ module WebDriverSpec
     FrameReference (..),
     WindowRect (..),
     --- actions
-    PointerOrigin(..),
-    Action(..),
-    Actions(..),
-    KeyAction(..),
-    Pointer(..),
-    PointerAction(..),
+    PointerOrigin (..),
+    Action (..),
+    Actions (..),
+    KeyAction (..),
+    Pointer (..),
+    PointerAction (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -72,6 +72,7 @@ module WebDriverSpec
     getPageSource,
     takeScreenshot,
     takeElementScreenshot,
+    performActions',
     printPage,
     executeScript,
     executeScriptAsync,
@@ -85,7 +86,7 @@ module WebDriverSpec
     getAlertText,
     sendAlertText,
     performActions,
-    releaseActions
+    releaseActions,
   )
 where
 
@@ -95,14 +96,14 @@ import Data.Aeson
     KeyValue ((.=)),
     ToJSON (toJSON),
     Value (..),
-    object,
+    object, (.:?), (.:?=), (.?=),
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
-import PyrethrumExtras (toS)
-import Prelude hiding (get, Down)
 import Data.Text qualified as T
+import PyrethrumExtras (toS)
+import Prelude hiding (Down, get, id)
 
 -- import Network.HTTP.Types qualified as NT (ResponseHeaders)
 
@@ -588,6 +589,10 @@ deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId 
 performActions :: SessionId -> Actions -> W3Spec ()
 performActions sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") (actionsToJson actions) voidParser
 
+-- POST 	/session/{session id}/actions 	Perform Actions
+performActions' :: SessionId -> Value -> W3Spec ()
+performActions' sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") actions voidParser
+
 -- DELETE 	/session/{session id}/actions 	Release Actions
 releaseActions :: SessionId -> W3Spec ()
 releaseActions sessionId = Delete "Release Actions" (sessionUri1 sessionId "actions") voidParser
@@ -862,36 +867,14 @@ keysJson keysToSend = object ["text" .= keysToSend]
 
 -- actions
 
-newtype Actions = MkActions {actions :: [[Action]]}
+newtype Actions = MkActions {actions :: [Action]}
 
 actionsToJson :: Actions -> Value
-actionsToJson = Array . fromList . fmap (Array . fromList . fmap toJSON) . (.actions) 
+actionsToJson MkActions {actions} =
+  object
+    [ "actions" .= actions
+    ]
 
-{-
-
-[
-  [
-    {
-      "actions": {
-        "actions": {
-          "duration": 4000,
-          "origin": "viewport",
-          "type": "pointerMove",
-          "x": 150,
-          "y": 150
-        },
-        "pointerId": 0,
-        "pressed": [],
-        "type": "mouse",
-        "x": 0,
-        "y": 0
-      },
-      "type": "pointer"
-    }
-  ]
-]
-
--}
 data KeyAction = KeyDown | KeyUp
   deriving (Show, Eq)
 
@@ -908,7 +891,7 @@ data Pointer
   | Touch
   deriving (Show, Eq)
 
-mkLwrString :: Show a => a -> Value
+mkLwrString :: (Show a) => a -> Value
 mkLwrString = String . T.toLower . show
 
 instance ToJSON Pointer where
@@ -928,37 +911,7 @@ instance ToJSON PointerOrigin where
     OriginPointer -> "pointer"
     OriginElement (Element id') -> object ["element" .= id']
 
-
--- https://www.w3.org/TR/webdriver2/#pointer-input-source
-data PointerAction
-  = Up {button :: Int} -- button
-  | Down {button :: Int} -- button
-  | Move
-      { origin :: PointerOrigin,
-        duration :: Maybe Int, -- ms
-        -- where to move to
-        x :: Int,
-        y :: Int
-      }
-  | Cancel
-  deriving (Show, Eq)
-
-
 -- TODO fix me
-instance ToJSON PointerAction where
-  toJSON :: PointerAction -> Value
-  toJSON = \case
-    Up b -> object ["type" .= ("pointerUp" :: Text), "button" .= b]
-    Down b -> object ["type" .= ("pointerDown" :: Text), "button" .= b]
-    Move {origin, duration, x, y} ->
-      object
-        [ "type" .= ("pointerMove" :: Text),
-          "origin" .= origin,
-          "duration" .= duration,
-          "x" .= x,
-          "y" .= y
-        ]
-    Cancel -> object ["type" .= ("pointerCancel" :: Text)]
 
 data Action
   = NoneAction (Maybe Int) -- duration in milliseconds (pause)
@@ -973,12 +926,14 @@ data Action
         -- keys codepoint https://www.w3.org/TR/webdriver2/#keyboard-actions
       }
   | Pointer
-      { subType :: Pointer,
-        pointerAction :: PointerAction,
-        pointerId :: Int, -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers.
+      { id :: Text,
+        subType :: Pointer,
+        -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers.
+        pointerId :: Int,
         pressed :: Set Int, -- pressed buttons
-        x :: Int, --  x location in viewport coordinates.
-        y :: Int -- y location in viewport coordinates
+        x :: Int, -- start x location in viewport coordinates.
+        y :: Int, -- start y location in viewport coordinates
+        actions :: [PointerAction]
       }
   | Wheel
       { duration :: Maybe Int,
@@ -990,51 +945,123 @@ data Action
       }
   deriving (Show, Eq)
 
+-- https://www.w3.org/TR/webdriver2/#pointer-input-source
+data PointerAction
+  = PointerPause {duration :: Maybe Int} -- ms
+  | Up {button :: Int} -- button
+  | Down {button :: Int} -- button
+  | Move
+      { origin :: PointerOrigin,
+        duration :: Maybe Int, -- ms
+        -- where to move to
+        width :: Maybe Int,
+        height :: Maybe Int,
+        pressure :: Maybe Double, -- 0 -> 1
+        tangentialPressure :: Maybe Double, -- -1 -> 1
+        tiltX :: Maybe Int, -- -90 -> 90
+        tiltY :: Maybe Int, -- -90 -> 90
+        twist :: Maybe Int, -- 0 -> 359
+        altitudeAngle :: Maybe Double, -- 0 -> pi/2
+        azimuthAngle :: Maybe Double, -- 0 -> 2pi
+        x :: Int,
+        y :: Int
+      }
+  | Cancel
+  deriving (Show, Eq)
+
+instance ToJSON PointerAction where
+  toJSON :: PointerAction -> Value
+  toJSON = \case
+    PointerPause d -> object ["type" .= ("pause" :: Text), "duration" .= d]
+    Up b -> object ["type" .= ("pointerUp" :: Text), "button" .= b]
+    Down b -> object ["type" .= ("pointerDown" :: Text), "button" .= b]
+    Move
+      { origin,
+        duration,
+        width,
+        height,
+        pressure,
+        tangentialPressure, -- -1 -> 1
+        tiltX, -- -90 -> 90
+        tiltY, -- -90 -> 90
+        twist, -- 0 -> 359
+        altitudeAngle, -- 0 -> pi/2
+        azimuthAngle, -- 0 -> 2pi
+        x,
+        y
+      } ->
+        object $
+          [ "type" .= ("pointerMove" :: Text),
+            "origin" .= origin,
+            "x" .= x,
+            "y" .= y
+          ] 
+          <> catMaybes [
+              ("duration" .=) <$> duration,
+              ("height" .=) <$> height,
+              ("pressure" .=) <$> pressure,
+              ("tangentialPressure" .=) <$> tangentialPressure,
+              ("tiltX" .=) <$> tiltX,
+              ("tiltY" .=) <$> tiltY,
+              ("twist" .=) <$> twist,
+              ("altitudeAngle" .=) <$> altitudeAngle,
+              ("azimuthAngle" .=) <$> azimuthAngle
+             ]
+           
+    Cancel -> object ["type" .= ("pointerCancel" :: Text)]
+
+
 -- TODO:: fix me
 instance ToJSON Action where
   toJSON :: Action -> Value
   toJSON = \case
-      NoneAction d -> object ["type" .= ("none" :: Text), "duration" .= d]
-      Key {keyAction, alt, ctrl, meta, shift, value} ->
+    NoneAction d -> object ["type" .= ("none" :: Text), "duration" .= d]
+    Key {keyAction, alt, ctrl, meta, shift, value} ->
+      object
+        [ "type" .= ("key" :: Text),
+          "actions"
+            .= object
+              [ "type" .= show keyAction,
+                "alt" .= alt,
+                "ctrl" .= ctrl,
+                "meta" .= meta,
+                "shift" .= shift,
+                "value" .= value
+              ]
+        ]
+    Pointer
+      { subType,
+        actions,
+        pointerId,
+        pressed,
+        id,
+        x,
+        y
+      } ->
         object
-          [ "type" .= ("key" :: Text),
-            "actions" .=
-              object
-                [ "type" .= show keyAction,
-                  "alt" .= alt,
-                  "ctrl" .= ctrl,
-                  "meta" .= meta,
-                  "shift" .= shift,
-                  "value" .= value
-                ]
+          [ "id" .= id,
+            "type" .= ("pointer" :: Text),
+            "parameters"
+              .= object
+                [ "pointerType" .= subType --,
+                  -- "pointerId" .= pointerId,
+                  -- "pressed" .= pressed,
+                  -- "x" .= x,
+                  -- "y" .= y
+                ],
+            "actions" .= actions
           ]
-      Pointer {subType, pointerAction, pointerId, pressed, x, y} ->
-        object
-          [ "type" .= ("pointer" :: Text),
-            "actions" .=
-              object
-                [ "type" .= subType,
-                  "actions" .= pointerAction,
-                  "pointerId" .= pointerId,
-                  "pressed" .= pressed,
-                  "x" .= x,
-                  "y" .= y
-                ]
-          ]
-      Wheel {duration, x, y, deltaX, deltay, scrollOrigin} ->
-        object
-          [ "type" .= ("wheel" :: Text),
-            "actions" .=
-              object
-                [ 
-                  "type" .= ("scroll" :: Text),
-                  "duration" .= duration,
-                  "x" .= x,
-                  "y" .= y,
-                  "deltaX" .= deltaX,
-                  "deltaY" .= deltay,
-                  "origin" .= scrollOrigin
-                ]
-          ]
-
-
+    Wheel {duration, x, y, deltaX, deltay, scrollOrigin} ->
+      object
+        [ "type" .= ("wheel" :: Text),
+          "actions"
+            .= object
+              [ "type" .= ("scroll" :: Text),
+                "duration" .= duration,
+                "x" .= x,
+                "y" .= y,
+                "deltaX" .= deltaX,
+                "deltaY" .= deltay,
+                "origin" .= scrollOrigin
+              ]
+        ]

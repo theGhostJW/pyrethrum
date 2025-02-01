@@ -102,7 +102,7 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     takeElementScreenshot,
-    takeScreenshot,
+    takeScreenshot, performActions',
   )
 import WebDriverPure (seconds)
 
@@ -531,61 +531,149 @@ demoAlerts = do
   deleteSession ses
 
 -- >>> demoActions
--- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/202bc6fe-1d9c-49b4-9107-cb3dafb7727b/actions"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
---  (StatusCodeException (Response {responseStatus = Status {statusCode = 400, statusMessage = "Bad Request"}, responseVersion = HTTP/1.1, responseHeaders = [("content-type","application/json; charset=utf-8"),("cache-control","no-cache"),("content-length","93"),("date","Thu, 30 Jan 2025 01:00:00 GMT")], responseBody = (), responseCookieJar = CJ {expose = []}, responseClose' = ResponseClose, responseOriginalRequest = Request {
---   host                 = "127.0.0.1"
---   port                 = 4444
---   secure               = False
---   requestHeaders       = [("Accept","application/json"),("Content-Type","application/json; charset=utf-8")]
---   path                 = "/session/202bc6fe-1d9c-49b4-9107-cb3dafb7727b/actions"
---   queryString          = ""
---   method               = "POST"
---   proxy                = Nothing
---   rawBody              = False
---   redirectCount        = 10
---   responseTimeout      = ResponseTimeoutDefault
---   requestVersion       = HTTP/1.1
---   proxySecureMode      = ProxySecureWithConnect
--- }
--- , responseEarlyHints = []}) "{\"value\":{\"error\":\"invalid argument\",\"message\":\"Body was not a JSON Object\",\"stacktrace\":\"\"}}"))
 demoActions :: IO ()
 demoActions = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
+  {-
   let actions =
         MkActions
-          [ [ Pointer
-                { subType = Mouse,
-                  pointerAction =
-                    Move
+          [ Pointer
+              { id = "mouse1",
+                subType = Mouse,
+                pointerId = 0,
+                pressed = Set.empty,
+                x = 0,
+                y = 0,
+                actions =
+                  [ Move
                       { origin = Viewport,
                         duration = Just $ 4 * seconds,
                         x = 150,
-                        y = 150
-                      },
-                  pointerId = 0,
-                  pressed = Set.empty,
-                  x = 0,
-                  y = 0
-                }
-            ]
+                        y = 150,
+                        width = Nothing,
+                        height = Nothing,
+                        pressure = Nothing,
+                        tangentialPressure = Nothing,
+                        tiltX = Nothing,
+                        tiltY = Nothing,
+                        twist = Nothing,
+                        altitudeAngle = Nothing,
+                        azimuthAngle = Nothing
+                      }
+                  ]
+              }
           ]
 
   performActions ses actions
+  -}
+
+  logTxt "none actions"
+  performActions' ses noneExample
+
+  logTxt "key actions"
+  performActions' ses keyExample
+
+  sleep2
+  logTxt "pointer actions"
+  performActions' ses pointerExample
+  
+  logTxt "wheel actions"
+  performActions' ses wheelExample
 
   sleep2
   deleteSession ses
+
+
+
+noneExample :: Text
+noneExample =
+  "{\n\
+  \  \"actions\": [\n\
+  \    {\n\
+  \      \"type\": \"none\",\n\
+  \      \"id\": \"idle1\",\n\
+  \      \"actions\": [\n\
+  \        {\n\
+  \          \"type\": \"pause\",\n\
+  \          \"duration\": 1000\n\
+  \        }\n\
+  \      ]\n\
+  \    }\n\
+  \  ]\n\
+  \}"
+
+keyExample :: Text
+keyExample =
+  "{\n\
+  \  \"actions\": [\n\
+  \    {\n\
+  \      \"type\": \"key\",\n\
+  \      \"id\": \"keyboard1\",\n\
+  \      \"actions\": [\n\
+  \        {\n\
+  \          \"type\": \"keyDown\",\n\
+  \          \"value\": \"a\"\n\
+  \        },\n\
+  \        {\n\
+  \          \"type\": \"keyUp\",\n\
+  \          \"value\": \"a\"\n\
+  \        }\n\
+  \      ]\n\
+  \    }\n\
+  \  ]\n\
+  \}"
+
+pointerExample :: Text
+pointerExample =
+  "{\n\
+  \  \"actions\": [\n\
+  \    {\n\
+  \      \"type\": \"pointer\",\n\
+  \      \"id\": \"mouse1\",\n\
+  \      \"parameters\": {\n\
+  \        \"pointerType\": \"mouse\"\n\
+  \      },\n\
+  \      \"actions\": [\n\
+  \        {\n\
+  \          \"type\": \"pointerDown\",\n\
+  \          \"button\": 0\n\
+  \        },\n\
+  \        {\n\
+  \          \"type\": \"pointerMove\",\n\
+  \          \"origin\": \"viewport\",\n\
+  \          \"duration\": 2500,\n\
+  \          \"x\": 600,\n\
+  \          \"y\": 600\n\
+  \        },\n\
+  \        {\n\
+  \          \"type\": \"pointerUp\",\n\
+  \          \"button\": 0\n\
+  \        }\n\
+  \      ]\n\
+  \    }\n\
+  \  ]\n\
+  \}"
+
+wheelExample :: Text
+wheelExample =
+  "{\n\
+  \  \"actions\": [\n\
+  \    {\n\
+  \      \"type\": \"wheel\",\n\
+  \      \"id\": \"wheel1\",\n\
+  \      \"actions\": [\n\
+  \        {\n\
+  \          \"type\": \"scroll\",\n\
+  \          \"origin\": \"viewport\",\n\
+  \          \"x\": 10,\n\
+  \          \"y\": 10,\n\
+  \          \"deltaX\": 0,\n\
+  \          \"deltaY\": 200,\n\
+  \          \"duration\": 2000\n\
+  \        }\n\
+  \      ]\n\
+  \    }\n\
+  \  ]\n\
+  \}"
+

@@ -43,6 +43,8 @@ module WebDriverIO
     newSession,
     newDefaultFirefoxSession,
     performActions,
+    -- just use text for debugging
+    performActions',
     releaseActions,
     deleteSession,
     navigateTo,
@@ -83,7 +85,7 @@ where
 
 -- import Effectful.Reader.Dynamic
 
-import Data.Aeson (Value, object)
+import Data.Aeson (Value, object, encode)
 import Data.Text.IO qualified as T
 import Network.HTTP.Req as R
   ( DELETE (DELETE),
@@ -110,10 +112,12 @@ import PyrethrumExtras (getLenient, toS, txt)
 
 import UnliftIO.Concurrent (threadDelay)
 import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
-import WebDriverPure (RequestArgs (..), capsToJson)
+import WebDriverPure (RequestArgs (..), capsToJson, prettyPrintJson, parseJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (get, second)
+import BasePrelude qualified as BP
+import Data.Aeson.Encode.Pretty (encodePretty)
 
 -- ############# IO Implementation #############
 
@@ -300,6 +304,10 @@ sendAlertText s = run . W.sendAlertText s
 performActions :: SessionId -> W.Actions -> IO ()
 performActions s = run . W.performActions s
 
+performActions' :: SessionId -> Text -> IO ()
+performActions' s = run . W.performActions' s . fromRight (error "FAILED") . parseJson
+
+
 releaseActions :: SessionId -> IO ()
 releaseActions = run . W.releaseActions
 
@@ -309,7 +317,7 @@ sleepMs :: Int -> IO ()
 sleepMs = threadDelay . (* 1_000)
 
 debug :: Bool
-debug = True
+debug = False
 
 -- no console out for "production"
 run :: (Show a) => W3Spec a -> IO a
@@ -317,6 +325,11 @@ run spec = do
   when debug $ do
     devLog "Request"
     devLog . txt $ spec
+    case spec of
+      Get {} -> pure ()
+      Post {body} -> devLog "body" >> prettyPrintJson body
+      PostEmpty {} -> pure ()
+      Delete {} -> pure ()
   callWebDriver debug (mkRequest spec) >>= parseIO spec
 
 -- TODO: will neeed to be parameterised later
@@ -357,6 +370,7 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     log = when wantLog . devLog
     url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
+  
 
 --------------------------------------------------------------------------------
 -- console out (to haskell output window) for debugging

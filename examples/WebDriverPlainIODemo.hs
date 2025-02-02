@@ -3,7 +3,7 @@ module WebDriverPlainIODemo where
 import Data.Aeson (Value (..))
 import Data.Set qualified as Set
 import Data.Text.IO qualified as TIO
-import PyrethrumExtras (txt)
+import PyrethrumExtras (txt, uu)
 import WebDriverDemoUtils
   ( alertsUrl,
     anyElmCss,
@@ -25,7 +25,7 @@ import WebDriverDemoUtils
     shadowDomUrl,
     theInternet,
     topFrameCSS,
-    userNameCss,
+    userNameCss, infinitScrollUrl,
   )
 import WebDriverIO
   ( Action (..),
@@ -91,6 +91,7 @@ import WebDriverIO
     newDefaultFirefoxSession,
     newWindow,
     performActions,
+    performActions',
     printPage,
     refresh,
     sendAlertText,
@@ -102,9 +103,10 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     takeElementScreenshot,
-    takeScreenshot, performActions',
+    takeScreenshot, WheelAction (..),
   )
-import WebDriverPure (seconds)
+import WebDriverPure (seconds, second)
+import Prelude hiding (Down, second)
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn
@@ -122,7 +124,7 @@ logShowM :: (Show a) => Text -> IO a -> IO ()
 logShowM l t = t >>= logShow l
 
 sleep1 :: IO ()
-sleep1 = sleepMs $ 1 * seconds
+sleep1 = sleepMs $ 1 * second
 
 sleep2 :: IO ()
 sleep2 = sleepMs $ 2 * seconds
@@ -530,13 +532,13 @@ demoAlerts = do
   sleep1
   deleteSession ses
 
--- >>> demoActions
-demoActions :: IO ()
-demoActions = do
+-- >>> demoPointerNoneActions
+demoPointerNoneActions :: IO ()
+demoPointerNoneActions = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
-  {-
-  let actions =
+
+  let pointer =
         MkActions
           [ Pointer
               { id = "mouse1",
@@ -546,11 +548,37 @@ demoActions = do
                 x = 0,
                 y = 0,
                 actions =
-                  [ Move
+                  [ PausePointer Nothing,
+                    Down
+                      { button = 0,
+                        width = Nothing,
+                        height = Nothing,
+                        pressure = Nothing,
+                        tangentialPressure = Nothing,
+                        tiltX = Nothing,
+                        tiltY = Nothing,
+                        twist = Nothing,
+                        altitudeAngle = Nothing,
+                        azimuthAngle = Nothing
+                      },
+                    Move
                       { origin = Viewport,
                         duration = Just $ 4 * seconds,
                         x = 150,
                         y = 150,
+                        width = Just 2,
+                        height = Just 2,
+                        pressure = Just 0.5,
+                        tangentialPressure = Just $ -0.4,
+                        tiltX = Just $ -50,
+                        tiltY = Just $ -50,
+                        twist = Just 5,
+                        altitudeAngle = Just 1.5,
+                        azimuthAngle = Just 6.2
+                      },
+                    PausePointer $ Just 1000,
+                    Up
+                      { button = 0,
                         width = Nothing,
                         height = Nothing,
                         pressure = Nothing,
@@ -561,47 +589,65 @@ demoActions = do
                         altitudeAngle = Nothing,
                         azimuthAngle = Nothing
                       }
+                    -- looks like Cancel not supported yet by gecko driver 02-02-2025
+                    -- https://searchfox.org/mozilla-central/source/remote/shared/webdriver/Actions.sys.mjs#2340
+                    -- , Cancel
+                  ]
+              },
+              NoneAction {
+                id = "NullAction",
+                actionsNone = [
+                  Nothing,
+                  Just $ 1 * second,
+                  Just $ 10 * seconds
+                ]}
+              --
+          ]
+
+  logTxt "move and None actions"
+  performActions ses pointer
+
+
+
+-- >>> demoWheelActions
+demoWheelActions :: IO ()
+demoWheelActions = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses infinitScrollUrl
+
+  let wheel = 
+        MkActions
+          [ Wheel 
+              { id = "wheel1",
+                wheelActions = 
+                  [ Scroll
+                      { origin = Viewport,
+                        x = 10,
+                        y = 10,
+                        deltaX = 400,
+                        deltaY = 4000,
+                        duration = Just $ 4 * seconds
+                      },
+                    PauseWheel $ Just 1000,
+                    Scroll
+                      { origin = Viewport,
+                        x = 10,
+                        y = 10,
+                        deltaX = -400,
+                        deltaY = -4000,
+                        duration = Just $ 4 * seconds
+                      }
                   ]
               }
           ]
 
-  performActions ses actions
-  -}
 
-  logTxt "none actions"
-  performActions' ses noneExample
-
-  logTxt "key actions"
-  performActions' ses keyExample
-
-  sleep2
-  logTxt "pointer actions"
-  performActions' ses pointerExample
-  
   logTxt "wheel actions"
-  performActions' ses wheelExample
+  performActions ses wheel
 
   sleep2
   deleteSession ses
 
-
-
-noneExample :: Text
-noneExample =
-  "{\n\
-  \  \"actions\": [\n\
-  \    {\n\
-  \      \"type\": \"none\",\n\
-  \      \"id\": \"idle1\",\n\
-  \      \"actions\": [\n\
-  \        {\n\
-  \          \"type\": \"pause\",\n\
-  \          \"duration\": 1000\n\
-  \        }\n\
-  \      ]\n\
-  \    }\n\
-  \  ]\n\
-  \}"
 
 keyExample :: Text
 keyExample =
@@ -623,57 +669,3 @@ keyExample =
   \    }\n\
   \  ]\n\
   \}"
-
-pointerExample :: Text
-pointerExample =
-  "{\n\
-  \  \"actions\": [\n\
-  \    {\n\
-  \      \"type\": \"pointer\",\n\
-  \      \"id\": \"mouse1\",\n\
-  \      \"parameters\": {\n\
-  \        \"pointerType\": \"mouse\"\n\
-  \      },\n\
-  \      \"actions\": [\n\
-  \        {\n\
-  \          \"type\": \"pointerDown\",\n\
-  \          \"button\": 0\n\
-  \        },\n\
-  \        {\n\
-  \          \"type\": \"pointerMove\",\n\
-  \          \"origin\": \"viewport\",\n\
-  \          \"duration\": 2500,\n\
-  \          \"x\": 600,\n\
-  \          \"y\": 600\n\
-  \        },\n\
-  \        {\n\
-  \          \"type\": \"pointerUp\",\n\
-  \          \"button\": 0\n\
-  \        }\n\
-  \      ]\n\
-  \    }\n\
-  \  ]\n\
-  \}"
-
-wheelExample :: Text
-wheelExample =
-  "{\n\
-  \  \"actions\": [\n\
-  \    {\n\
-  \      \"type\": \"wheel\",\n\
-  \      \"id\": \"wheel1\",\n\
-  \      \"actions\": [\n\
-  \        {\n\
-  \          \"type\": \"scroll\",\n\
-  \          \"origin\": \"viewport\",\n\
-  \          \"x\": 10,\n\
-  \          \"y\": 10,\n\
-  \          \"deltaX\": 0,\n\
-  \          \"deltaY\": 200,\n\
-  \          \"duration\": 2000\n\
-  \        }\n\
-  \      ]\n\
-  \    }\n\
-  \  ]\n\
-  \}"
-

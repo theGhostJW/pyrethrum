@@ -20,6 +20,7 @@ module WebDriverSpec
     KeyAction (..),
     Pointer (..),
     PointerAction (..),
+    WheelAction (..),
     -- Capabilities(..),
     mkShowable,
     --- Specs
@@ -96,7 +97,10 @@ import Data.Aeson
     KeyValue ((.=)),
     ToJSON (toJSON),
     Value (..),
-    object, (.:?), (.:?=), (.?=),
+    object,
+    (.:?),
+    (.:?=),
+    (.?=),
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
@@ -914,7 +918,11 @@ instance ToJSON PointerOrigin where
 -- TODO fix me
 
 data Action
-  = NoneAction (Maybe Int) -- duration in milliseconds (pause)
+  = NoneAction
+      { id :: Text,
+        -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers.
+        actionsNone :: [Maybe Int] -- delay
+      }
   | Key
       { keyAction :: KeyAction,
         alt :: Bool,
@@ -936,28 +944,82 @@ data Action
         actions :: [PointerAction]
       }
   | Wheel
-      { duration :: Maybe Int,
-        x :: Int,
-        y :: Int,
-        deltaX :: Int,
-        deltay :: Int,
-        scrollOrigin :: String
+      { id :: Text,
+        wheelActions :: [WheelAction]
       }
   deriving (Show, Eq)
 
+data WheelAction
+  = PauseWheel {duration :: Maybe Int} -- ms
+  | Scroll
+      { origin :: PointerOrigin,
+        x :: Int,
+        y :: Int,
+        deltaX :: Int,
+        deltaY :: Int,
+        duration :: Maybe Int -- ms
+      }
+  deriving (Show, Eq)
+
+instance ToJSON WheelAction where
+  toJSON :: WheelAction -> Value
+  toJSON wa =
+    object $ base <> catMaybes [opt "duration" wa.duration]
+    where
+      base = case wa of
+        PauseWheel _ -> ["type" .= ("pause" :: Text)]
+        Scroll
+          { origin,
+            x,
+            y,
+            deltaX,
+            deltaY
+          } ->
+            [ "type" .= ("scroll" :: Text),
+              "origin" .= origin,
+              "x" .= x,
+              "y" .= y,
+              "deltaX" .= deltaX,
+              "deltaY" .= deltaY
+            ]
+
 -- https://www.w3.org/TR/webdriver2/#pointer-input-source
 data PointerAction
-  = PointerPause {duration :: Maybe Int} -- ms
-  | Up {button :: Int} -- button
-  | Down {button :: Int} -- button
+  = PausePointer {duration :: Maybe Int} -- ms
+  | Up
+      { button :: Int,
+        width :: Maybe Int,
+        height :: Maybe Int,
+        pressure :: Maybe Float, -- 0 -> 1
+        tangentialPressure :: Maybe Float, -- -1 -> 1
+        tiltX :: Maybe Int, -- -90 -> 90
+        tiltY :: Maybe Int, -- -90 -> 90
+        twist :: Maybe Int, -- 0 -> 359
+        altitudeAngle :: Maybe Double, -- 0 -> pi/2
+        azimuthAngle :: Maybe Double -- 0 -> 2pi-- button} -- button
+      }
+  | Down
+      { button :: Int,
+        width :: Maybe Int,
+        height :: Maybe Int,
+        pressure :: Maybe Float, -- 0 -> 1
+        tangentialPressure :: Maybe Float, -- -1 -> 1
+        tiltX :: Maybe Int, -- -90 -> 90
+        tiltY :: Maybe Int, -- -90 -> 90
+        twist :: Maybe Int, -- 0 -> 359
+        altitudeAngle :: Maybe Double, -- 0 -> pi/2
+        azimuthAngle :: Maybe Double -- 0 -> 2pi-- button
+      }
   | Move
       { origin :: PointerOrigin,
         duration :: Maybe Int, -- ms
         -- where to move to
+        -- though the spec seems to indicate width and height are double
+        -- gecko driver was blowing up with anything other than int
         width :: Maybe Int,
         height :: Maybe Int,
-        pressure :: Maybe Double, -- 0 -> 1
-        tangentialPressure :: Maybe Double, -- -1 -> 1
+        pressure :: Maybe Float, -- 0 -> 1
+        tangentialPressure :: Maybe Float, -- -1 -> 1
         tiltX :: Maybe Int, -- -90 -> 90
         tiltY :: Maybe Int, -- -90 -> 90
         twist :: Maybe Int, -- 0 -> 359
@@ -966,15 +1028,73 @@ data PointerAction
         x :: Int,
         y :: Int
       }
-  | Cancel
+  | -- looks like not supported yet by gecko driver 02-02-2025
+    -- https://searchfox.org/mozilla-central/source/remote/shared/webdriver/Actions.sys.mjs#2340
+    Cancel
   deriving (Show, Eq)
 
 instance ToJSON PointerAction where
   toJSON :: PointerAction -> Value
   toJSON = \case
-    PointerPause d -> object ["type" .= ("pause" :: Text), "duration" .= d]
-    Up b -> object ["type" .= ("pointerUp" :: Text), "button" .= b]
-    Down b -> object ["type" .= ("pointerDown" :: Text), "button" .= b]
+    PausePointer d ->
+      object $
+        ["type" .= ("pause" :: Text)]
+          <> catMaybes [opt "duration" d]
+    Up
+      { -- https://www.w3.org/TR/pointerevents/#dom-pointerevent-pointerid
+        button,
+        width, -- magnitude on the X axis), in CSS pixels (see [CSS21]) -- default = 1
+        height, -- (magnitude on the Y axis), in CSS pixels (see [CSS21]) -- default = 1
+        pressure, -- 0 - 1
+        tangentialPressure, -- -1 -> 1
+        tiltX, -- -90 -> 90
+        tiltY, -- -90 -> 90
+        twist, -- 0 -> 359
+        altitudeAngle, -- 0 -> pi/2
+        azimuthAngle -- 0 -> 2pi
+      } ->
+        object $
+          [ "type" .= ("pointerUp" :: Text),
+            "button" .= button
+          ]
+            <> catMaybes
+              [ opt "height" height,
+                opt "width" width,
+                opt "pressure" pressure,
+                opt "tangentialPressure" tangentialPressure,
+                opt "tiltX" tiltX,
+                opt "tiltY" tiltY,
+                opt "twist" twist,
+                opt "altitudeAngle" altitudeAngle,
+                opt "azimuthAngle" azimuthAngle
+              ]
+    Down
+      { button,
+        width,
+        height,
+        pressure,
+        tangentialPressure, -- -1 -> 1
+        tiltX, -- -90 -> 90
+        tiltY, -- -90 -> 90
+        twist, -- 0 -> 359
+        altitudeAngle, -- 0 -> pi/2
+        azimuthAngle -- 0 -> 2pi
+      } ->
+        object $
+          [ "type" .= ("pointerDown" :: Text),
+            "button" .= button
+          ]
+            <> catMaybes
+              [ opt "height" height,
+                opt "width" width,
+                opt "pressure" pressure,
+                opt "tangentialPressure" tangentialPressure,
+                opt "tiltX" tiltX,
+                opt "tiltY" tiltY,
+                opt "twist" twist,
+                opt "altitudeAngle" altitudeAngle,
+                opt "azimuthAngle" azimuthAngle
+              ]
     Move
       { origin,
         duration,
@@ -995,27 +1115,41 @@ instance ToJSON PointerAction where
             "origin" .= origin,
             "x" .= x,
             "y" .= y
-          ] 
-          <> catMaybes [
-              ("duration" .=) <$> duration,
-              ("height" .=) <$> height,
-              ("pressure" .=) <$> pressure,
-              ("tangentialPressure" .=) <$> tangentialPressure,
-              ("tiltX" .=) <$> tiltX,
-              ("tiltY" .=) <$> tiltY,
-              ("twist" .=) <$> twist,
-              ("altitudeAngle" .=) <$> altitudeAngle,
-              ("azimuthAngle" .=) <$> azimuthAngle
-             ]
-           
+          ]
+            <> catMaybes
+              [ opt "duration" duration,
+                opt "height" height,
+                opt "width" width,
+                opt "pressure" pressure,
+                opt "tangentialPressure" tangentialPressure,
+                opt "tiltX" tiltX,
+                opt "tiltY" tiltY,
+                opt "twist" twist,
+                opt "altitudeAngle" altitudeAngle,
+                opt "azimuthAngle" azimuthAngle
+              ]
+    -- looks like Cancel not supported yet by gecko driver 02-02-2025
+    -- https://searchfox.org/mozilla-central/source/remote/shared/webdriver/Actions.sys.mjs#2340
     Cancel -> object ["type" .= ("pointerCancel" :: Text)]
 
+opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
+opt lbl mb = (lbl .=) <$> mb
 
--- TODO:: fix me
+mkPause :: Maybe Int -> Value
+mkPause d = object $ ["type" .= ("pause" :: Text)] <> catMaybes [opt "duration" d]
+
 instance ToJSON Action where
   toJSON :: Action -> Value
   toJSON = \case
-    NoneAction d -> object ["type" .= ("none" :: Text), "duration" .= d]
+    NoneAction
+      { id,
+        actionsNone
+      } ->
+        object
+          [ "type" .= ("none" :: Text),
+            "id" .= id,
+            "actions" .= (mkPause <$> actionsNone)
+          ]
     Key {keyAction, alt, ctrl, meta, shift, value} ->
       object
         [ "type" .= ("key" :: Text),
@@ -1041,27 +1175,16 @@ instance ToJSON Action where
         object
           [ "id" .= id,
             "type" .= ("pointer" :: Text),
-            "parameters"
-              .= object
-                [ "pointerType" .= subType --,
-                  -- "pointerId" .= pointerId,
-                  -- "pressed" .= pressed,
-                  -- "x" .= x,
-                  -- "y" .= y
-                ],
+            "subType" .= subType,
+            "pointerId" .= pointerId,
+            "pressed" .= pressed,
+            "x" .= x,
+            "y" .= y,
             "actions" .= actions
           ]
-    Wheel {duration, x, y, deltaX, deltay, scrollOrigin} ->
+    Wheel {id, wheelActions} ->
       object
-        [ "type" .= ("wheel" :: Text),
-          "actions"
-            .= object
-              [ "type" .= ("scroll" :: Text),
-                "duration" .= duration,
-                "x" .= x,
-                "y" .= y,
-                "deltaX" .= deltaX,
-                "deltaY" .= deltay,
-                "origin" .= scrollOrigin
-              ]
+        [ "id" .= id,
+          "type" .= ("wheel" :: Text),
+          "actions" .= wheelActions
         ]

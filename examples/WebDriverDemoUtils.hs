@@ -11,6 +11,9 @@ theInternet = "https://the-internet.herokuapp.com/"
 alertsUrl :: Text
 alertsUrl = "https://the-internet.herokuapp.com/javascript_alerts"
 
+infinitScrollUrl :: Text
+infinitScrollUrl = "https://the-internet.herokuapp.com/infinite_scroll"
+
 checkBoxesLinkCss :: Selector
 checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 

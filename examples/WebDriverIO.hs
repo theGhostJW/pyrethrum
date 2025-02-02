@@ -86,7 +86,7 @@ where
 
 -- import Effectful.Reader.Dynamic
 
-import Data.Aeson (Value, object, encode)
+import Data.Aeson (Value, object)
 import Data.Text.IO qualified as T
 import Network.HTTP.Req as R
   ( DELETE (DELETE),
@@ -117,8 +117,6 @@ import WebDriverPure (RequestArgs (..), capsToJson, prettyPrintJson, parseJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (get, second)
-import BasePrelude qualified as BP
-import Data.Aeson.Encode.Pretty (encodePretty)
 
 -- ############# IO Implementation #############
 

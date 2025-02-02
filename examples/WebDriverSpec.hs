@@ -98,9 +98,6 @@ import Data.Aeson
     ToJSON (toJSON),
     Value (..),
     object,
-    (.:?),
-    (.:?=),
-    (.?=),
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
@@ -879,14 +876,35 @@ actionsToJson MkActions {actions} =
     [ "actions" .= actions
     ]
 
-data KeyAction = KeyDown | KeyUp
+data KeyAction
+  = PauseKey {duration :: Maybe Int} -- ms
+  | KeyDown
+      { 
+        value :: Text
+      }
+  | KeyUp
+      { 
+        value :: Text
+      }
   deriving (Show, Eq)
 
 instance ToJSON KeyAction where
   toJSON :: KeyAction -> Value
-  toJSON = \case
-    KeyDown -> "keyDown"
-    KeyUp -> "keyUp"
+  toJSON PauseKey {duration} =
+    object $
+      [ "type" .= ("pause" :: Text)
+      ]
+      <> catMaybes [opt "duration" duration]
+  toJSON KeyDown {value} =
+    object
+      [ "type" .= ("keyDown" :: Text),
+        "value" .= String value
+      ]
+  toJSON KeyUp {value} =
+    object
+      [ "type" .= ("keyUp" :: Text),
+        "value" .= String value
+      ]
 
 -- Pointer subtypes
 data Pointer
@@ -921,15 +939,11 @@ data Action
   = NoneAction
       { id :: Text,
         -- the numeric id of the pointing device. This is a positive integer, with the values 0 and 1 reserved for mouse-type pointers.
-        actionsNone :: [Maybe Int] -- delay
+        noneActions :: [Maybe Int] -- delay
       }
   | Key
-      { keyAction :: KeyAction,
-        alt :: Bool,
-        ctrl :: Bool,
-        meta :: Bool,
-        shift :: Bool,
-        value :: Set Char
+      { id :: Text,
+        keyActions :: [KeyAction]
         -- https://github.com/jlipps/simple-wd-spec?tab=readme-ov-file#perform-actions
         -- keys codepoint https://www.w3.org/TR/webdriver2/#keyboard-actions
       }
@@ -1143,26 +1157,19 @@ instance ToJSON Action where
   toJSON = \case
     NoneAction
       { id,
-        actionsNone
+        noneActions
       } ->
         object
           [ "type" .= ("none" :: Text),
             "id" .= id,
-            "actions" .= (mkPause <$> actionsNone)
+            "actions" .= (mkPause <$> noneActions)
           ]
-    Key {keyAction, alt, ctrl, meta, shift, value} ->
-      object
-        [ "type" .= ("key" :: Text),
-          "actions"
-            .= object
-              [ "type" .= show keyAction,
-                "alt" .= alt,
-                "ctrl" .= ctrl,
-                "meta" .= meta,
-                "shift" .= shift,
-                "value" .= value
-              ]
-        ]
+    Key {id, keyActions} ->
+      object [
+         "id" .= id,
+         "type" .= ("key" :: Text),
+          "actions" .= keyActions
+      ]
     Pointer
       { subType,
         actions,

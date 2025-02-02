@@ -3,7 +3,7 @@ module WebDriverPlainIODemo where
 import Data.Aeson (Value (..))
 import Data.Set qualified as Set
 import Data.Text.IO qualified as TIO
-import PyrethrumExtras (txt, uu)
+import PyrethrumExtras (txt)
 import WebDriverDemoUtils
   ( alertsUrl,
     anyElmCss,
@@ -91,7 +91,6 @@ import WebDriverIO
     newDefaultFirefoxSession,
     newWindow,
     performActions,
-    performActions',
     printPage,
     refresh,
     sendAlertText,
@@ -103,7 +102,7 @@ import WebDriverIO
     switchToParentFrame,
     switchToWindow,
     takeElementScreenshot,
-    takeScreenshot, WheelAction (..),
+    takeScreenshot, WheelAction (..), releaseActions,
   )
 import WebDriverPure (seconds, second)
 import Prelude hiding (Down, second)
@@ -596,7 +595,7 @@ demoPointerNoneActions = do
               },
               NoneAction {
                 id = "NullAction",
-                actionsNone = [
+                noneActions = [
                   Nothing,
                   Just $ 1 * second,
                   Just $ 10 * seconds
@@ -606,8 +605,6 @@ demoPointerNoneActions = do
 
   logTxt "move and None actions"
   performActions ses pointer
-
-
 
 -- >>> demoWheelActions
 demoWheelActions :: IO ()
@@ -648,24 +645,42 @@ demoWheelActions = do
   sleep2
   deleteSession ses
 
+-- >>> demoKeyAndReleaseActions
+demoKeyAndReleaseActions :: IO ()
+demoKeyAndReleaseActions = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses loginUrl
+  usr <- findElement ses userNameCss
+  elementClick ses usr
 
-keyExample :: Text
-keyExample =
-  "{\n\
-  \  \"actions\": [\n\
-  \    {\n\
-  \      \"type\": \"key\",\n\
-  \      \"id\": \"keyboard1\",\n\
-  \      \"actions\": [\n\
-  \        {\n\
-  \          \"type\": \"keyDown\",\n\
-  \          \"value\": \"a\"\n\
-  \        },\n\
-  \        {\n\
-  \          \"type\": \"keyUp\",\n\
-  \          \"value\": \"a\"\n\
-  \        }\n\
-  \      ]\n\
-  \    }\n\
-  \  ]\n\
-  \}"
+  let keys =
+        MkActions
+          [ Key
+              { id = "keyboard1",
+                keyActions =
+                  [ 
+                    PauseKey Nothing,
+                    KeyDown "a",
+                    -- a random pause to test the API
+                    PauseKey . Just $ 2 * seconds,
+                    KeyUp "a",
+                    -- select the a
+                    -- send special control key not a raw control character
+                    -- Use \xE009 to represent the Unicode code point U+E009
+                    KeyDown "\xE009",
+                    KeyDown "a",
+                    -- this will do nothing - just used for correlating frames
+                    -- just testing tha API
+                    PauseKey Nothing
+                  ]
+              }
+          ]
+  
+  sleep2
+  logTxt "key actions"
+  performActions ses keys
+
+  sleep2
+  releaseActions ses
+  sleep2
+  deleteSession ses

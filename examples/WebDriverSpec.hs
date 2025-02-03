@@ -97,7 +97,7 @@ import Data.Aeson
     KeyValue ((.=)),
     ToJSON (toJSON),
     Value (..),
-    object,
+    object, fromJSON, Result (..),
   )
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
@@ -105,13 +105,8 @@ import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Text qualified as T
 import PyrethrumExtras (toS)
 import Prelude hiding (Down, get, id)
-
--- import Network.HTTP.Types qualified as NT (ResponseHeaders)
-
-{- Pure types and functions used in Webdriver -}
-
---  TODO: add error handler / classifier
--- (Webdriver errors - library agnostic) vs HTTP errors (eg. driver not runnning - library dependent?)
+import WebDriverPure (opt)
+import Capabilities (Timeouts (..))
 
 data W3Spec a
   = Get
@@ -152,9 +147,6 @@ data HttpResponse = Response
   { statusCode :: Int,
     statusMessage :: Text,
     body :: Value
-    -- not used yet may be able to remove and reduce dependencies
-    -- headers :: NT.ResponseHeaders,
-    -- cookies :: NC.CookieJar
   }
   deriving (Show)
 
@@ -227,12 +219,12 @@ instance ToJSON Cookie where
         "value" .= value
       ]
         <> catMaybes
-          [ ("path" .=) <$> path,
-            ("domain" .=) <$> domain,
-            ("secure" .=) <$> secure,
-            ("httpOnly" .=) <$> httpOnly,
-            ("sameSite" .=) <$> sameSite,
-            ("expiry" .=) <$> expiry
+          [ opt "path" path,
+            opt "domain" domain,
+            opt "secure" secure,
+            opt "httpOnly" httpOnly,
+            opt "sameSite" sameSite,
+            opt "expiry" expiry
           ]
 
 cookieJSON :: Cookie -> Value
@@ -247,57 +239,6 @@ data Selector
   | TagName Text
   deriving (Show, Eq)
 
--- TODO capabilities for all browsers - to annewSessionSpec'd from JSON
--- move to separate module added typed definition to all APIs that require
--- JSON
-data Capabilities = MkCapabilities
-  {
-  }
-  -- NOT IMPLEMENTED
-  -- browserName :: Text,
-  -- browserVersion :: Text,
-  -- platformName :: Text
-
-  deriving (Show)
-
-{-
--- TODO: own capabilities type to from Json
--- capsToJson :: Capabilities -> Value
--- capsToJson caps = uu
-
-object
-  [ "capabilities"
-      .= object
-        ["alwaysMatch" .= toJSON caps],
-    "desiredCapabilities" .= toJSON caps
-  ]
-
-to / from JSON
-instance ToJSON Capabilities where
-  toJSON Capabilities {browserName, browserVersion, platformName} =
-    object
-      [ "browserName" .= browserName,
-        "browserVersion" .= browserVersion,
-        "platformName" .= platformName
-      ]
-
-instance FromJSON Capabilities where
-  parseJSON = withObject "Capabilities" $ \o ->
-    Capabilities
-      <$> o .: "browserName"
-      <*> o .: "browserVersion"
-      <*> o .: "platformName"
-
--- from w3c library
-capsToJson :: Capabilities -> Value
-capsToJson caps =
-  object
-    [ "capabilities"
-        .= object
-          ["alwaysMatch" .= toJSON caps],
-      "desiredCapabilities" .= toJSON caps
-    ]
--}
 
 -- ######################################################################
 -- ########################### WebDriver API ############################
@@ -373,9 +314,9 @@ POST 	/session/{session id}/print 	Print Page
 -- 61 endpoints
 -- Method 	URI Template 	Command
 
--- TODO: native capabilities type - change this to use type
--- newSessionSpec :: Capabilities -> W3Spec SessionRef
--- newSessionSpec capabilities = newSessionSpec' $ capsToJson capabilities
+-- -- TODO: native capabilities type - change this to use type
+-- newSession :: Capabilities -> W3Spec SessionId
+-- newSession capabilities = newSessionSpec' $ capsToJson capabilities
 
 -- POST 	/session 	New Session
 newSession' :: Value -> W3Spec SessionId
@@ -649,6 +590,14 @@ instance ToJSON WindowRect where
         "height" .= height
       ]
 
+parseTimeouts :: HttpResponse -> Maybe Timeouts
+parseTimeouts r = do 
+  r' <- bodyValue r
+  let rslt = fromJSON r' 
+  case rslt of 
+    Success a -> Just a
+    Error _ -> Nothing
+
 parseWindowRect :: HttpResponse -> Maybe WindowRect
 parseWindowRect r =
   Rect
@@ -662,12 +611,6 @@ parseWindowRect r =
 mkScript :: Text -> [Value] -> Value
 mkScript script args = object ["script" .= script, "args" .= args]
 
-data Timeouts = Timeouts
-  { implicit :: Int,
-    pageLoad :: Int,
-    script :: Int
-  }
-  deriving (Show)
 
 windowHandleParser :: HttpResponse -> Maybe WindowHandle
 windowHandleParser r =
@@ -708,16 +651,6 @@ cookieFromBody b = do
       sameSite = lookupSameSite "sameSite" b
       expiry = lookupInt "expiry" b
   pure $ Cookie {..}
-
-parseTimeouts :: HttpResponse -> Maybe Timeouts
-parseTimeouts r =
-  liftA3
-    Timeouts
-    (bdyInt "implicit")
-    (bdyInt "pageLoad")
-    (bdyInt "script")
-  where
-    bdyInt = bodyInt r
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -1145,9 +1078,6 @@ instance ToJSON PointerAction where
     -- looks like Cancel not supported yet by gecko driver 02-02-2025
     -- https://searchfox.org/mozilla-central/source/remote/shared/webdriver/Actions.sys.mjs#2340
     Cancel -> object ["type" .= ("pointerCancel" :: Text)]
-
-opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
-opt lbl mb = (lbl .=) <$> mb
 
 mkPause :: Maybe Int -> Value
 mkPause d = object $ ["type" .= ("pause" :: Text)] <> catMaybes [opt "duration" d]

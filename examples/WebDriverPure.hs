@@ -7,6 +7,7 @@ module WebDriverPure
     jsonToText,
     prettyPrintJson,
     parseJson,
+    opt,
     second,
     seconds,  
     minute, 
@@ -54,6 +55,9 @@ hour = 60 * minutes
 
 hours :: Int
 hours = hour
+
+opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
+opt lbl mb = (lbl .=) <$> mb
 
 -- todo stand alone instance of Show
 data RequestArgs where

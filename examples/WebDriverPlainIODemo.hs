@@ -133,9 +133,9 @@ mkExtendedTimeoutsSession = do
   ses <- newDefaultFirefoxSession
   setTimeouts ses $
     Timeouts
-      { pageLoad = 30 * seconds,
-        script = 11 * seconds,
-        implicit = 12 * seconds
+      { pageLoad = Just $ 30 * seconds,
+        script = Just $  11 * seconds,
+        implicit = Just $ 12 * seconds
       }
   pure ses
 
@@ -287,9 +287,9 @@ demoTimeouts = do
   logShowM "timeouts" $ getTimeouts ses
   setTimeouts ses $
     Timeouts
-      { pageLoad = 50 * seconds,
-        script = 11 * seconds,
-        implicit = 12 * seconds
+      { pageLoad = Just $ 50 * seconds,
+        script = Just $ 11 * seconds,
+        implicit = Just $ 12 * seconds
       }
   logShowM "updated timeouts" $ getTimeouts ses
   deleteSession ses

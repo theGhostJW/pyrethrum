@@ -28,7 +28,7 @@ import Network.HTTP.Req as R
     NoReqBody (NoReqBody),
     ProvidesBody,
   )
-import Web.Api.WebDriver (Capabilities)
+
 import Prelude hiding (get, second)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy qualified as LBS
@@ -82,7 +82,6 @@ capsToJson caps =
           ["alwaysMatch" .= toJSON caps],
       "desiredCapabilities" .= toJSON caps
     ]
-
 
 -- Todo move to pyrelude
 -- Aeson stuff to help debugging

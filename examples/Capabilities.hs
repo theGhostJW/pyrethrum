@@ -136,7 +136,18 @@ instance FromJSON VendorSpecific where
 -- ToJSON Instances
 instance ToJSON Capabilities where
   toJSON :: Capabilities -> Value
-  toJSON (Capabilities name version platform acceptInsecure pageLoad proxy timeouts strictFile unhandledPrompt vendor) =
+  toJSON Capabilities {
+    name,
+    version,
+    platform,
+    acceptInsecure,
+    pageLoad,
+    proxy,
+    timeouts,
+    strictFile,
+    unhandledPrompt,
+    vendor
+  } =
     object $
       [ "browserName" .= toJSON name,
         "browserVersion" .= version,

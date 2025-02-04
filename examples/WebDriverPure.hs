@@ -2,7 +2,6 @@
 
 module WebDriverPure
   ( RequestArgs (..),
-    capsToJson,
     defaultRequest,
     jsonToText,
     prettyPrintJson,
@@ -73,15 +72,6 @@ data RequestArgs where
 
 defaultRequest :: RequestArgs
 defaultRequest = RequestParams [] GET NoReqBody 4444
-
-capsToJson :: Capabilities -> Value
-capsToJson caps =
-  object
-    [ "capabilities"
-        .= object
-          ["alwaysMatch" .= toJSON caps],
-      "desiredCapabilities" .= toJSON caps
-    ]
 
 -- Todo move to pyrelude
 -- Aeson stuff to help debugging

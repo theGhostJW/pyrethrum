@@ -6,7 +6,7 @@ module WebDriverIOStubs where
 
 import WebDriverIO
     ( status,
-      newDefaultFirefoxSession,
+      minFirefoxSession,
       deleteSession,
       navigateTo,
       findElement,
@@ -32,9 +32,9 @@ _status = status
 -- >>> _status
 -- Ready
 
-_newDefaultFirefoxSession :: IO SessionId
-_newDefaultFirefoxSession = newDefaultFirefoxSession
--- >>> newDefaultFirefoxSession
+_minFirefoxSession :: IO SessionId
+_minFirefoxSession = minFirefoxSession
+-- >>> minFirefoxSession
 
 -- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
 
@@ -226,7 +226,7 @@ _clickCheckBoxesLink = elementClick _latestSession _checkboxesLinkElement
 _endToEnd :: IO ()
 _endToEnd = do
     status' <- status
-    ses <- newDefaultFirefoxSession
+    ses <- minFirefoxSession
     maximizeWindow ses
     navigateTo ses _theInternet
     link <- findElement ses _checkBoxesLinkCss

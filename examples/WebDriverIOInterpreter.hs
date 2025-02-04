@@ -16,7 +16,7 @@ import WebDriverIO
     deleteSession,
     getElementText,
     navigateTo,
-    newDefaultFirefoxSession,
+    minFirefoxSession,
     status, findElement, fullScreenWindow, maximizeWindow, minimizeWindow, sleepMs,
   )
 
@@ -27,7 +27,7 @@ runWebDriver =
       -- driver
       DriverStatus -> status
       -- session
-      NewSession -> newDefaultFirefoxSession
+      NewSession -> minFirefoxSession
       KillSession sessionRef -> deleteSession sessionRef
       -- window
       FullscreenWindow sessionRef -> fullScreenWindow sessionRef

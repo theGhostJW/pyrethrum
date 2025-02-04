@@ -42,7 +42,7 @@ module WebDriverIO
     closeWindow,
     newWindow,
     newSession,
-    newDefaultFirefoxSession,
+    minFirefoxSession,
     performActions,
     -- just use text for debugging
     performActions',
@@ -108,15 +108,12 @@ import Network.HTTP.Req as R
     (/:),
   )
 import PyrethrumExtras (getLenient, toS, txt)
--- import UnliftIO (try)
--- TODO deprecate
-
 import UnliftIO.Concurrent (threadDelay)
-import Web.Api.WebDriver (Capabilities, defaultFirefoxCapabilities)
-import WebDriverPure (RequestArgs (..), capsToJson, prettyPrintJson, parseJson)
+import WebDriverPure (RequestArgs (..), prettyPrintJson, parseJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (get, second)
+import Capabilities (Capabilities, capsToJson, minFirefoxCapabilities)
 
 -- ############# IO Implementation #############
 
@@ -183,8 +180,8 @@ refresh = run . W.refresh
 setWindowRect :: SessionId -> W.WindowRect -> IO W.WindowRect
 setWindowRect s = run . W.setWindowRect s
 
-newDefaultFirefoxSession :: IO SessionId
-newDefaultFirefoxSession = newSession defaultFirefoxCapabilities
+minFirefoxSession :: IO SessionId
+minFirefoxSession = newSession minFirefoxCapabilities
 
 deleteSession :: SessionId -> IO ()
 deleteSession = run . W.deleteSession

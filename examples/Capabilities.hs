@@ -1,24 +1,69 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Capabilities where
+module Capabilities
+  ( capsToJson,
+    Capabilities (..),
+    UnhandledPromptBehavior (..),
+    PageLoadStrategy (..),
+    BrowserName (..),
+    PlatformName (..),
+    Proxy (..),
+    Timeouts (..),
+    VendorSpecific (..),
+    minCapabilities,
+    minFirefoxCapabilities,
+    minChromeCapabilities
+  )
+where
 
 import Data.Aeson.Key (fromText)
 import Data.Aeson.Types
-    ( (.:),
-      (.:?),
-      withObject,
-      withText,
-      object,
-      FromJSON(parseJSON),
-      Object,
-      Value,
-      KeyValue((.=)),
-      ToJSON(toJSON),
-      Pair,
-      Parser )
+  ( FromJSON (parseJSON),
+    KeyValue ((.=)),
+    Object,
+    Pair,
+    Parser,
+    ToJSON (toJSON),
+    Value (..),
+    object,
+    withObject,
+    withText,
+    (.:),
+    (.:?),
+  )
 import WebDriverPure (opt)
 import Prelude hiding (Proxy)
+
+
+minCapabilities :: BrowserName -> Capabilities
+minCapabilities browserName = MkCapabilities
+  { browserName,
+    browserVersion = Nothing,
+    platformName = Nothing,
+    acceptInsecureCerts = Nothing,
+    pageLoadStrategy = Nothing,
+    proxy = Nothing,
+    timeouts = Nothing,
+    strictFileInteractability = Nothing,
+    unhandledPromptBehavior = Nothing,
+    vendorSpecific = Nothing
+  }
+
+minFirefoxCapabilities :: Capabilities
+minFirefoxCapabilities = minCapabilities Firefox
+
+minChromeCapabilities :: Capabilities
+minChromeCapabilities = minCapabilities Chrome
+
+capsToJson :: Capabilities -> Value
+capsToJson caps =
+  object
+    [ "capabilities"
+        .= object
+          ["alwaysMatch" .= caps],
+      "desiredCapabilities" .= caps
+    ]
 
 -- Custom Types for Enums
 data UnhandledPromptBehavior
@@ -52,7 +97,7 @@ data PlatformName
   deriving (Show, Generic)
 
 -- Core Capabilities
-data Capabilities = Capabilities
+data Capabilities = MkCapabilities
   { browserName :: BrowserName,
     browserVersion :: Maybe Text,
     platformName :: Maybe PlatformName,
@@ -66,16 +111,73 @@ data Capabilities = Capabilities
   }
   deriving (Show, Generic)
 
--- Proxy Configuration
-data Proxy = Proxy
-  { proxyType :: Text,
-    proxyAutoconfigUrl :: Maybe Text,
+
+data SocksProxy = SocksProxy
+  { socksProxy :: Text,
+    socksVersion :: Int
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON SocksProxy where
+  toJSON :: SocksProxy -> Value
+  toJSON SocksProxy {..} =
+    object
+      [ "socksProxy" .= socksProxy,
+        "socksVersion" .= socksVersion
+      ]
+
+instance FromJSON SocksProxy where
+  parseJSON :: Value -> Parser SocksProxy
+  parseJSON = withObject "SocksProxy" $ \v ->
+    SocksProxy
+      <$> v .: "socksProxy"
+      <*> v .: "socksVersion"
+
+data Proxy
+  = Direct
+  | Manual {
     ftpProxy :: Maybe Text,
     httpProxy :: Maybe Text,
     sslProxy :: Maybe Text,
+    socksProxy :: Maybe SocksProxy,
     noProxy :: Maybe [Text]
   }
-  deriving (Show, Generic)
+  | AutoDetect
+  | System
+  | Pac {
+    proxyAutoconfigUrl :: Text
+  }
+  deriving (Show, Eq)
+
+instance ToJSON Proxy where
+  toJSON :: Proxy -> Value
+  toJSON = \case
+    Direct -> "direct"
+    AutoDetect -> "autodetect"
+    System -> "system"
+    Pac {..} -> object ["proxyAutoconfigUrl" .= proxyAutoconfigUrl]
+    Manual {..} ->
+      object $ catMaybes
+        [ opt "ftpProxy" ftpProxy,
+          opt "httpProxy" httpProxy,
+          opt "sslProxy" sslProxy,
+          opt "socksProxy" socksProxy,
+          opt "noProxy" noProxy
+        ]
+
+-- TODO :: test esp manual 
+instance FromJSON Proxy where
+  parseJSON :: Value -> Parser Proxy
+  parseJSON = withObject "Proxy" $ 
+    \v -> do
+      let 
+          direct = v .: "direct" >>= bool (fail "Invalid Proxy") (pure Direct) 
+          autoDetect = v .: "autodetect" >>= bool (fail "Invalid Proxy") (pure AutoDetect)
+          system = v .: "system" >>= bool (fail "Invalid Proxy") (pure System)
+          pac = Pac <$> v .: "proxyAutoconfigUrl"
+          manual = Manual <$> v .:? "ftpProxy" <*> v .:? "httpProxy" <*> v .:? "sslProxy" <*> v .:? "socksProxy" <*> v .:? "noProxy"
+      direct <|> autoDetect <|> system <|> pac <|> manual
+
 
 -- Timeouts Configuration
 data Timeouts = Timeouts
@@ -136,30 +238,34 @@ instance FromJSON VendorSpecific where
 -- ToJSON Instances
 instance ToJSON Capabilities where
   toJSON :: Capabilities -> Value
-  toJSON Capabilities {
-    name,
-    version,
-    platform,
-    acceptInsecure,
-    pageLoad,
-    proxy,
-    timeouts,
-    strictFile,
-    unhandledPrompt,
-    vendor
-  } =
-    object $
-      [ "browserName" .= toJSON name,
-        "browserVersion" .= version,
-        "platformName" .= toJSON platform,
-        "acceptInsecureCerts" .= acceptInsecure,
-        "pageLoadStrategy" .= toJSON pageLoad,
-        "proxy" .= proxy,
-        "timeouts" .= timeouts,
-        "strictFileInteractability" .= strictFile,
-        "unhandledPromptBehavior" .= toJSON unhandledPrompt
-      ]
-        <> vendorSpecificToJSON vendor
+  toJSON
+    MkCapabilities
+      { browserName,
+        browserVersion,
+        platformName,
+        acceptInsecureCerts,
+        pageLoadStrategy,
+        proxy,
+        timeouts,
+        strictFileInteractability,
+        unhandledPromptBehavior,
+        vendorSpecific
+      } =
+      object $
+        [ "browserName" .= browserName
+        ]
+          <> catMaybes [
+            opt "browserVersion" browserVersion,
+            opt "platformName" platformName,
+            opt "acceptInsecureCerts" acceptInsecureCerts,
+            opt "pageLoadStrategy" pageLoadStrategy,
+            opt "proxy" proxy,
+            opt "timeouts" timeouts,
+            opt "strictFileInteractability" strictFileInteractability,
+            opt "unhandledPromptBehavior" unhandledPromptBehavior
+          ]
+          <> vendorSpecificToJSON vendorSpecific
+
 
 vendorSpecificToJSON :: Maybe VendorSpecific -> [Pair]
 vendorSpecificToJSON = maybe [] vendorSpecificToJSON'
@@ -172,26 +278,6 @@ vendorSpecificToJSON = maybe [] vendorSpecificToJSON'
       ChromeOptions {} -> "goog:chromeOptions"
       FirefoxOptions {} -> "moz:firefoxOptions"
       SafariOptions {} -> "safari:options"
-
-instance ToJSON Proxy where
-  toJSON :: Proxy -> Value
-  toJSON
-    Proxy
-      { proxyType,
-        proxyAutoconfigUrl,
-        ftpProxy,
-        httpProxy,
-        sslProxy,
-        noProxy
-      } =
-      object $
-        [ "proxyType" .= proxyType,
-          "proxyAutoconfigUrl" .= proxyAutoconfigUrl,
-          "ftpProxy" .= ftpProxy,
-          "httpProxy" .= httpProxy,
-          "sslProxy" .= sslProxy
-        ]
-          <> ["noProxy" .= noProxy | isJust noProxy]
 
 instance ToJSON Timeouts where
   toJSON :: Timeouts -> Value
@@ -240,46 +326,46 @@ instance ToJSON PlatformName where
 instance FromJSON UnhandledPromptBehavior where
   parseJSON :: Value -> Parser UnhandledPromptBehavior
   parseJSON = withText "UnhandledPromptBehavior" $ \case
-    "dismiss" -> return Dismiss
-    "accept" -> return Accept
-    "dismiss and notify" -> return DismissAndNotify
-    "accept and notify" -> return AcceptAndNotify
-    "ignore" -> return Ignore
-    _ -> fail "Invalid UnhandledPromptBehavior"
+    "dismiss" -> pure Dismiss
+    "accept" ->  pure Accept
+    "dismiss and notify" -> pure DismissAndNotify
+    "accept and notify" -> pure  AcceptAndNotify
+    "ignore" -> pure Ignore
+    other -> fail $ "UnhandledPromptBehavior: " <> show other
 
 instance FromJSON PageLoadStrategy where
   parseJSON :: Value -> Parser PageLoadStrategy
   parseJSON = withText "PageLoadStrategy" $ \case
-    "none" -> return None
-    "eager" -> return Eager
-    "normal" -> return Normal
+    "none" -> pure None
+    "eager" -> pure Eager
+    "normal" -> pure Normal
     _ -> fail "Invalid PageLoadStrategy"
 
 instance FromJSON BrowserName where
   parseJSON :: Value -> Parser BrowserName
   parseJSON = withText "BrowserName" $ \case
-    "chrome" -> return Chrome
-    "firefox" -> return Firefox
-    "safari" -> return Safari
-    "edge" -> return Edge
-    "internet explorer" -> return InternetExplorer
+    "chrome" -> pure Chrome
+    "firefox" -> pure Firefox
+    "safari" -> pure Safari
+    "edge" -> pure Edge
+    "internet explorer" -> pure InternetExplorer
     _ -> fail "Invalid BrowserName"
 
 instance FromJSON PlatformName where
   parseJSON :: Value -> Parser PlatformName
   parseJSON = withText "PlatformName" $ \case
-    "windows" -> return Windows
-    "mac" -> return Mac
-    "linux" -> return Linux
-    "android" -> return Android
-    "ios" -> return IOS
+    "windows" -> pure Windows
+    "mac" -> pure Mac
+    "linux" -> pure Linux
+    "android" -> pure Android
+    "ios" -> pure IOS
     _ -> fail "Invalid PlatformName"
 
 -- FromJSON Instances for Data Structures
 instance FromJSON Capabilities where
   parseJSON :: Value -> Parser Capabilities
   parseJSON = withObject "Capabilities" $ \v ->
-    Capabilities
+    MkCapabilities
       <$> v .: "browserName"
       <*> v .:? "browserVersion"
       <*> v .:? "platformName"
@@ -299,17 +385,6 @@ parseVendorSpecific v =
     .:? "moz:firefoxOptions"
     <|> v
     .:? "safari:options"
-
-instance FromJSON Proxy where
-  parseJSON :: Value -> Parser Proxy
-  parseJSON = withObject "Proxy" $ \v ->
-    Proxy
-      <$> v .: "proxyType"
-      <*> v .:? "proxyAutoconfigUrl"
-      <*> v .:? "ftpProxy"
-      <*> v .:? "httpProxy"
-      <*> v .:? "sslProxy"
-      <*> v .:? "noProxy"
 
 instance FromJSON Timeouts where
   parseJSON :: Value -> Parser Timeouts

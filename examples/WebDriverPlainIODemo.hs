@@ -88,7 +88,7 @@ import WebDriverIO
     maximizeWindow,
     minimizeWindow,
     navigateTo,
-    newDefaultFirefoxSession,
+    minFirefoxSession,
     newWindow,
     performActions,
     printPage,
@@ -130,7 +130,7 @@ sleep2 = sleepMs $ 2 * seconds
 
 mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do
-  ses <- newDefaultFirefoxSession
+  ses <- minFirefoxSession
   setTimeouts ses $
     Timeouts
       { pageLoad = Just $ 30 * seconds,
@@ -142,7 +142,7 @@ mkExtendedTimeoutsSession = do
 -- >>> demoSessionDriverStatus
 demoSessionDriverStatus :: IO ()
 demoSessionDriverStatus = do
-  ses <- newDefaultFirefoxSession
+  ses <- minFirefoxSession
   log "new session" $ txt ses
   logShowM "driver status" status
   deleteSession ses
@@ -281,7 +281,7 @@ demoElementPageProps = do
 -- >>> demoTimeouts
 demoTimeouts :: IO ()
 demoTimeouts = do
-  ses <- newDefaultFirefoxSession
+  ses <- minFirefoxSession
   log "new session" $ txt ses
   ---
   logShowM "timeouts" $ getTimeouts ses

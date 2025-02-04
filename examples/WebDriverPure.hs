@@ -2,8 +2,11 @@
 
 module WebDriverPure
   ( RequestArgs (..),
-    capsToJson,
     defaultRequest,
+    jsonToText,
+    prettyPrintJson,
+    parseJson,
+    opt,
     second,
     seconds,  
     minute, 
@@ -24,8 +27,12 @@ import Network.HTTP.Req as R
     NoReqBody (NoReqBody),
     ProvidesBody,
   )
-import Web.Api.WebDriver (Capabilities)
+
 import Prelude hiding (get, second)
+import Data.Aeson.Encode.Pretty (encodePretty)
+import Data.ByteString.Lazy qualified as LBS
+import Data.Text.Encoding qualified as E
+import Data.Text.IO qualified as T
 
 {- Pure types and functions used in Webdriver -}
 
@@ -48,6 +55,9 @@ hour = 60 * minutes
 hours :: Int
 hours = hour
 
+opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
+opt lbl mb = (lbl .=) <$> mb
+
 -- todo stand alone instance of Show
 data RequestArgs where
   RequestParams ::
@@ -58,25 +68,12 @@ data RequestArgs where
       port :: Int
     } ->
     RequestArgs
+  
 
 defaultRequest :: RequestArgs
 defaultRequest = RequestParams [] GET NoReqBody 4444
 
-capsToJson :: Capabilities -> Value
-capsToJson caps =
-  object
-    [ "capabilities"
-        .= object
-          ["alwaysMatch" .= toJSON caps],
-      "desiredCapabilities" .= toJSON caps
-    ]
-
-{-
-import Data.Aeson.Encode.Pretty (encodePretty)
-import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Encoding qualified as E
-import Data.Text.IO qualified as T
-
+-- Todo move to pyrelude
 -- Aeson stuff to help debugging
 -- https://blog.ssanj.net/posts/2019-09-24-pretty-printing-json-in-haskell.html
 lsbToText :: LBS.ByteString -> Text
@@ -87,6 +84,10 @@ jsonToText = lsbToText . encodePretty
 
 prettyPrintJson :: Value -> IO ()
 prettyPrintJson = T.putStrLn . jsonToText
--}
+
+parseJson :: Text -> Either String Value
+parseJson input =
+  eitherDecodeStrict (encodeUtf8 input)
+
 
 

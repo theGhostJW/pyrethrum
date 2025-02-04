@@ -6,20 +6,21 @@ module WebDriverIOStubs where
 
 import WebDriverIO
     ( status,
-      newDefaultFirefoxSession,
+      minFirefoxSession,
       deleteSession,
       navigateTo,
       findElement,
-      click,
+      elementClick,
       maximizeWindow,
       minimizeWindow,
-      fullscreenWindow,
-      elementText )
+      fullScreenWindow,
+      getElementText, 
+      WindowRect )
 import WebDriverSpec
     ( DriverStatus,
-      SessionRef(Session),
+      SessionId(Session),
       Selector(..),
-      ElementRef(Element) )
+      ElementId(Element) )
 import Prelude hiding (get, second)
 import Data.Text.IO qualified as T
 import PyrethrumExtras (txt)
@@ -31,9 +32,9 @@ _status = status
 -- >>> _status
 -- Ready
 
-_newDefaultFirefoxSession :: IO SessionRef
-_newDefaultFirefoxSession = newDefaultFirefoxSession
--- >>> newDefaultFirefoxSession
+_minFirefoxSession :: IO SessionId
+_minFirefoxSession = minFirefoxSession
+-- >>> minFirefoxSession
 
 -- *** Exception: VanillaHttpException (HttpExceptionRequest Request {
 
@@ -68,21 +69,21 @@ _newDefaultFirefoxSession = newDefaultFirefoxSession
 -- }
 -- , responseEarlyHints = []}) "{\"value\":{\"error\":\"session not created\",\"message\":\"Session is already started\",\"stacktrace\":\"\"}}"))
 
-_latestSession :: SessionRef
+_latestSession :: SessionId
 _latestSession = Session "1beac3df-15c8-490d-8eb5-65691b6e16d0"
 
-_maximizeWindow :: IO ()
+_maximizeWindow :: IO WindowRect
 _maximizeWindow = maximizeWindow _latestSession
 
 -- >>> _maximizeWindow
 
-_minimizeWindow :: IO ()
+_minimizeWindow :: IO WindowRect
 _minimizeWindow = minimizeWindow _latestSession
 
 -- >>> _minimizeWindow
 
-_fullscreenWindow :: IO ()
-_fullscreenWindow = fullscreenWindow _latestSession
+_fullscreenWindow :: IO WindowRect
+_fullscreenWindow = fullScreenWindow _latestSession
 
 -- >>> _fullscreenWindow
 
@@ -133,16 +134,16 @@ _navigateToTheInternet = navigateTo _latestSession _theInternet
 _checkBoxesLinkCss :: Selector
 _checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
 
-_findCheckBoxesLink :: IO ElementRef
+_findCheckBoxesLink :: IO ElementId
 _findCheckBoxesLink = findElement _latestSession _checkBoxesLinkCss
 
 -- >>> _findCheckBoxesLink
 -- Element {id = "ffef18ab-c34c-48b5-8031-4b762c453b64"}
 
-_checkboxesLinkElement :: ElementRef
+_checkboxesLinkElement :: ElementId
 _checkboxesLinkElement = Element "ffef18ab-c34c-48b5-8031-4b762c453b64"
 
-_findMissing :: IO ElementRef
+_findMissing :: IO ElementId
 _findMissing = findElement _latestSession $ CSS "#notHere"
 
 -- >>> _findMissing
@@ -181,13 +182,13 @@ _findMissing = findElement _latestSession $ CSS "#notHere"
 -- , responseEarlyHints = []}) "{\"value\":{\"error\":\"no such element\",\"message\":\"Unable to locate element: #notHere\",\"stacktrace\":\"RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8\\nWebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5\\nNoSuchElementError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:511:5\\ndom.find/</<@chrome://remote/content/shared/DOM.sys.mjs:136:16\\n\"}}")))
 
 _checkBoxesLinkText :: IO Text
-_checkBoxesLinkText = elementText _latestSession _checkboxesLinkElement
+_checkBoxesLinkText = getElementText _latestSession _checkboxesLinkElement
 
 -- >>> _checkBoxesLinkText
 -- "Checkboxes"
 
 _clickCheckBoxesLink :: IO ()
-_clickCheckBoxesLink = click _latestSession _checkboxesLinkElement
+_clickCheckBoxesLink = elementClick _latestSession _checkboxesLinkElement
 
 -- >>> _clickCheckBoxesLink
 -- *** Exception: user error (VanillaHttpException (HttpExceptionRequest Request {
@@ -225,12 +226,12 @@ _clickCheckBoxesLink = click _latestSession _checkboxesLinkElement
 _endToEnd :: IO ()
 _endToEnd = do
     status' <- status
-    ses <- newDefaultFirefoxSession
+    ses <- minFirefoxSession
     maximizeWindow ses
     navigateTo ses _theInternet
     link <- findElement ses _checkBoxesLinkCss
-    cbTxt <- elementText ses link
-    click ses link
+    cbTxt <- getElementText ses link
+    elementClick ses link
     deleteSession ses
     T.putStrLn ""
     T.putStrLn $ "----- " <> "Results" <> " -----"

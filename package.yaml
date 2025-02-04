@@ -118,8 +118,6 @@ dependencies:
   # - http-client
   # - http-types
   - req
-  # webdriver used in TestdemoSelenium
-  - webdriver-w3c
   # - name: base
   #   mixin:
   #     - hiding (Prelude)

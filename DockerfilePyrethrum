@@ -16,7 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     USER_GID=1001
     
 ARG REPO=https://github.com/theGhostJW/pyrethrum.git
-ARG BRANCH=poc-lazy-exe-doc
+ARG BRANCH=master
 
 # ensure switched user
 USER ${USER_UID}:${USER_GID}
@@ -38,6 +38,7 @@ RUN REPO_DIR=$(basename -s .git "${REPO}") \
     # build it all (go have coffee for an hour or more)
     # libraries will be cached by cabal
     # local modules => dist-newstyle
+    && cabal update \
     && cabal build \
     # local copy module build artifacts to home dir
     # note this does not work cabal is too clever with its cach invalidation

@@ -1,10 +1,10 @@
 cabal-version: 3.6
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5a57a438d20dbf824425ee512df043d8df1b2db6786c34e1faac5f057fd888b1
+-- hash: 21f68538be52b22cf6f1cfeddd9a9b717885bd503b99db92a5818e065a5e637e
 
 name:           pyrethrum
 version:        0.1.0.0
@@ -111,6 +111,7 @@ library
       SuiteRuntimePropTest
       SuiteRuntimeTest
       SuiteRuntimeTestBase
+      Capabilities
       DocumenterDemo
       EffectfulDemoSpeakEffect
       EffectfulDemoSpeakIOInterpreterDynamic
@@ -128,11 +129,13 @@ library
       RunDemo
       TestCompilerErrorDemo
       WebDriverDemo
+      WebDriverDemoUtils
       WebDriverDocInterpreter
       WebDriverEffect
       WebDriverIO
       WebDriverIOInterpreter
       WebDriverIOStubs
+      WebDriverPlainIODemo
       WebDriverPure
       WebDriverSpec
   hs-source-dirs:
@@ -223,6 +226,5 @@ library
     , transformers-either
     , unliftio
     , unordered-containers
-    , webdriver-w3c
     , yaml
   default-language: Haskell2010

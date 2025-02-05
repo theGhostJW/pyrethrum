@@ -72,3 +72,5 @@ echo "Firefox installation complete"
 #   -v /run/user/$(id -u)/pulse:/run/user/$(id -u)/pulse \
 #   -e PULSE_SERVER=unix:/run/user/$(id -u)/pulse/native \
 #   your-container-image
+
+

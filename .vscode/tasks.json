@@ -86,6 +86,17 @@
         "showReuseMessage": false
       },
       "problemMatcher": []
+    },
+    {
+      "label": "gecko driver",
+      "type": "shell",
+      "command": "pkill -f geckodriver || true  && geckodriver &",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": true
+      },
+      "problemMatcher": []
     }
   ]
 }

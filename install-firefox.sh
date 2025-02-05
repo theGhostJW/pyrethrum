@@ -43,16 +43,16 @@ export LC_ALL=en_AU.UTF-8
 # pulseaudio --start
 
 # Download the latest Firefox tarball
-wget -O /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US"
+wget -O /tmp/firefox.tar.xz "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US"
 
 # Extract the tarball to /opt
-tar -xjf /tmp/firefox.tar.bz2 -C /opt/
+tar -xjf /tmp/firefox.tar.xz -C /opt/
 
 # Create a symbolic link to the Firefox binary
 ln -s /opt/firefox/firefox /usr/local/bin/firefox
 
 # Clean up
-rm /tmp/firefox.tar.bz2
+rm /tmp/firefox.tar.xz
 
 # # Download a test audio file
 # wget -O /tmp/test-audio.wav "https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.wav"

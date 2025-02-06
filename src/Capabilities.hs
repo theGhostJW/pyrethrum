@@ -35,6 +35,7 @@ import Data.Aeson.Types
   )
 import Utils (opt)
 import Prelude hiding (Proxy)
+import GHC.Generics
 
 
 minCapabilities :: BrowserName -> Capabilities

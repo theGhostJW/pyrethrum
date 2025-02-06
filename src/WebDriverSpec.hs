@@ -91,7 +91,6 @@ module WebDriverSpec
   )
 where
 
-import BasePrelude qualified as BP
 import Data.Aeson
   ( Key,
     KeyValue ((.=)),
@@ -107,6 +106,7 @@ import PyrethrumExtras (toS)
 import Prelude hiding (Down, get, id)
 import Utils (opt)
 import Capabilities (Timeouts (..))
+import Data.Text (Text)
 
 data W3Spec a
   = Get

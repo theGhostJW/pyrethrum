@@ -6,7 +6,6 @@ module WebDriverPure
     jsonToText,
     prettyPrintJson,
     parseJson,
-    opt,
     second,
     seconds,  
     minute, 

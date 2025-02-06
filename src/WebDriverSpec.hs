@@ -105,7 +105,7 @@ import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Text qualified as T
 import PyrethrumExtras (toS)
 import Prelude hiding (Down, get, id)
-import WebDriverPure (opt)
+import Utils (opt)
 import Capabilities (Timeouts (..))
 
 data W3Spec a

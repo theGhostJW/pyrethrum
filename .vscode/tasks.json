@@ -15,40 +15,11 @@
       "problemMatcher": []
     },
     {
-      "label": "build",
-      "dependsOrder": "sequence",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": true
-      },
-      "dependsOn": [
-        "hpack",
-        "cabal build"
-      ]
-    },
-    {
-      "label": "hpack",
-      "type": "shell",
-      "command": "hpack",
-      "args": [
-        "--force"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "cabal build",
       "type": "shell",
       "command": "cabal",
       "args": [
-        "build",
-        // "-v3",
-        "--flags='-optimised +godLibrary'"
+        "build"
       ],
       "presentation": {
         "reveal": "always",

@@ -17,6 +17,7 @@ module Capabilities
   )
 where
 
+import Data.Text (Text)
 import Data.Aeson.Key (fromText)
 import Data.Aeson.Types
   ( FromJSON (parseJSON),
@@ -32,7 +33,7 @@ import Data.Aeson.Types
     (.:),
     (.:?),
   )
-import WebDriverPure (opt)
+import Utils (opt)
 import Prelude hiding (Proxy)
 
 

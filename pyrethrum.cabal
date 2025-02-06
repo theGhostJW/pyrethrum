@@ -20,211 +20,188 @@ build-type:     Simple
 extra-source-files:
     README.md
     ChangeLog.md
-common optimisation
-  if flag(optimised)
-    ghc-options: -O2
-  else
-    ghc-options: -O0
-common testLibProps
-  build-depends:
-    tasty
-    , tasty-hunit
-    , tasty-hedgehog
-    , tasty-discover
-    , hedgehog
-    , bytestring
-    , falsify
+
+common commonExtensions
+  default-extensions:
+    AllowAmbiguousTypes
+    BangPatterns
+    BlockArguments
+    ConstrainedClassMethods
+    ConstraintKinds
+    DisambiguateRecordFields
+    DuplicateRecordFields
+    DataKinds
+    DefaultSignatures
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveLift
+    DeriveTraversable
+    DerivingStrategies
+    EmptyCase
+    ExistentialQuantification
+    ExtendedDefaultRules
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    InstanceSigs
+    KindSignatures
+    LambdaCase
+    LiberalTypeSynonyms
+    MultiParamTypeClasses
+    MultiWayIf
+    NamedFieldPuns
+    NoFieldSelectors
+    NumericUnderscores
+    OverloadedStrings
+    OverloadedRecordDot
+    PartialTypeSignatures
+    PatternSynonyms
+    PolyKinds
+    QuasiQuotes
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    StrictData
+    TemplateHaskell
+    TupleSections
+    TypeApplications
+    TypeFamilies
+    TypeFamilyDependencies
+    TypeOperators
+
+
+
+-- common pyrethrumProps
+--   hs-source-dirs:
+--     src
+--   build-depends:
+--     deepseq
+--     , unordered-containers
+--     , template-haskell
+--     , fmt
+
+
+-- common reludeImports
+--   build-depends:
+--    base
+--    , relude
+--    , pyrethrum-extras
+--   mixins:
+--     base hiding (Prelude),
+--     relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
+
+-- flag optimised
+--   description: is the exe optimised
+--   manual: True
+--   default: False
+library utils
+  import: commonExtensions
+  exposed-modules:
+      Utils
+  -- other-modules:
+  --     UtilsPure
   hs-source-dirs:
-    test
-common pyrethrumProps
-  hs-source-dirs:
-    src
+      utils-src
   build-depends:
-    deepseq
-    , unordered-containers
-    , template-haskell
-    , fmt
-common libImports
-  if flag(godLibrary)
-    import:
-      testLibProps, optimisation
-  else
-    import:
-      optimisation
-common reludeImports
-  build-depends:
-   base
-   , relude
-   , pyrethrum-extras
-  mixins:
-    base hiding (Prelude),
-    relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
+    , base
+    , aeson
 
-source-repository head
-  type: git
-  location: https://github.com/githubuser/simple-hpack
-
-flag godLibrary
-  description: compile all modules (including tests) into one module
-  manual: True
-  default: True
-
-flag optimised
-  description: is the exe optimised
-  manual: True
-  default: False
 
 library
-  import: libImports, pyrethrumProps, reludeImports
+  import: commonExtensions
   exposed-modules:
-      AuxFiles
-      Check
-      Core
-      CoreTypeFamilies
-      CoreTypes
-      CoreUtils
-      DSL.DocInterpreterUtils
-      DSL.FileSystemDocInterpreter
-      DSL.FileSystemEffect
-      DSL.FileSystemIOInterpreter
-      DSL.Internal.FileSystemIO
-      DSL.Internal.FileSystemPure
-      DSL.Internal.NodeLog
-      DSL.Logging
-      DSL.OutEffect
-      DSL.OutInterpreter
-      Filter
-      Internal.Logging
-      Internal.LogQueries
-      Internal.SuiteFiltering
-      Internal.SuiteRuntime
-      Internal.SuiteValidation
-      OrphanedInstances
-      Prepare
-      ArbitraryIOTest
-      AuxFilesTest
-      CheckTest
-      FilterTest
-      FullSuiteTestTemplate
-      LogListCheck
-      RunnerTest
-      SuiteRuntimePropTest
-      SuiteRuntimeTest
-      SuiteRuntimeTestBase
       Capabilities
-      DocumenterDemo
-      EffectfulDemoSpeakEffect
-      EffectfulDemoSpeakIOInterpreterDynamic
-      FileSystemDocDemo
-      HigherOrderEffectDemo
-      IOActionDemo
-      IOActionDocInterpreter
-      IOActionEffect
-      IOActionIOInterpreter
-      IOEffectDemo
-      LazyinessSuiteDemo
-      PyrethrumBase
-      PyrethrumConfigTypes
-      PyrethrumDemoTest
-      RunDemo
-      TestCompilerErrorDemo
-      WebDriverDemo
-      WebDriverDemoUtils
-      WebDriverDocInterpreter
-      WebDriverEffect
-      WebDriverIO
-      WebDriverIOInterpreter
-      WebDriverIOStubs
-      WebDriverPlainIODemo
-      WebDriverPure
       WebDriverSpec
   hs-source-dirs:
       src
-      test
-      examples
-  default-extensions:
-      AllowAmbiguousTypes
-      BangPatterns
-      BlockArguments
-      ConstrainedClassMethods
-      ConstraintKinds
-      DisambiguateRecordFields
-      DuplicateRecordFields
-      DataKinds
-      DefaultSignatures
-      DeriveFoldable
-      DeriveFunctor
-      DeriveGeneric
-      DeriveLift
-      DeriveTraversable
-      DerivingStrategies
-      EmptyCase
-      ExistentialQuantification
-      ExtendedDefaultRules
-      FlexibleContexts
-      FlexibleInstances
-      FunctionalDependencies
-      GADTs
-      GeneralizedNewtypeDeriving
-      ImportQualifiedPost
-      InstanceSigs
-      KindSignatures
-      LambdaCase
-      LiberalTypeSynonyms
-      MultiParamTypeClasses
-      MultiWayIf
-      NamedFieldPuns
-      NoFieldSelectors
-      NumericUnderscores
-      OverloadedStrings
-      OverloadedRecordDot
-      PartialTypeSignatures
-      PatternSynonyms
-      PolyKinds
-      QuasiQuotes
-      RankNTypes
-      RecordWildCards
-      ScopedTypeVariables
-      StandaloneDeriving
-      StrictData
-      TemplateHaskell
-      TupleSections
-      TypeApplications
-      TypeFamilies
-      TypeFamilyDependencies
-      TypeOperators
-  ghc-options: -fmax-pmcheck-models=10000000 -ferror-spans -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fplugin=Effectful.Plugin -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
+  ghc-options: 
+    -fmax-pmcheck-models=10000000 -ferror-spans -O2 -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
   build-depends:
-      aeson
+    , base
+    , aeson
     , aeson-pretty
-    , base-prelude
+    , base
     , bytestring
-    , chronos
-    , containers
-    , deepseq
-    , directory
-    , dlist
-    , effectful
-    , effectful-core
-    , effectful-plugin
-    , effectful-th
-    , exceptions
-    , extra
-    , fmt
-    , hashable
-    , mtl
-    , path
-    , path-io
-    , pretty-show
     , pyrethrum-extras
-    , random
-    , raw-strings-qq
-    , req
-    , template-haskell
     , text
-    , time
-    , transformers-either
-    , unliftio
-    , unordered-containers
-    , yaml
+    , pyrethrum:utils
+
+
+    -- , chronos
+    -- , containers
+    -- , deepseq
+    -- , directory
+    -- , dlist
+    -- , effectful
+    -- , effectful-core
+    -- , effectful-plugin
+    -- , effectful-th
+    -- , exceptions
+    -- , extra
+    -- , fmt
+    -- , hashable
+    -- , mtl
+    -- , path
+    -- , path-io
+    -- , pretty-show
+    -- , random
+    -- , raw-strings-qq
+    -- , req
+    -- , template-haskell
+    -- , text
+    -- , time
+    -- , transformers-either
+    -- , unliftio
+    -- , unordered-containers
+    -- , yaml
   default-language: Haskell2010
+
+
+-- test-suite test
+--   import: pyrethrumProps, reludeImports
+--   type: exitcode-stdio-1.0
+--   main-is: test/Main.hs
+--   hs-source-dirs:
+--       test
+--     , tasty
+--     , tasty-hunit
+--     , tasty-hedgehog
+--     , tasty-discover
+--     , hedgehog
+--     , bytestring
+--     , falsify
+--   default-extensions:
+--       AllowAmbiguousTypes
+--       BangPatterns
+--       BlockArguments
+--       ConstrainedClassMethods
+--       ConstraintKinds
+--       DisambiguateRecordFields
+--       DuplicateRecordFields
+--       DataKinds
+--       DefaultSignatures
+--       DeriveFoldable
+--       DeriveFunctor
+--       DeriveGeneric
+--       DeriveLift
+--       DeriveTraversable
+--       DerivingStrategies
+--       EmptyCase
+--       ExistentialQuantification
+--       ExtendedDefaultRules
+--       FlexibleContexts
+--       FlexibleInstances
+--       FunctionalDependencies
+--       GADTs
+--       GeneralizedNewtypeDeriving
+--       ImportQualifiedPost
+--       InstanceSigs
+--       KindSignatures
+--     build-depends:
+
+  

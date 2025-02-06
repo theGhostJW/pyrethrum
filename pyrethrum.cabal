@@ -129,11 +129,11 @@ library
     , bytestring
     , pyrethrum-extras
     , text
+    , containers
     , pyrethrum:utils
 
 
     -- , chronos
-    -- , containers
     -- , deepseq
     -- , directory
     -- , dlist

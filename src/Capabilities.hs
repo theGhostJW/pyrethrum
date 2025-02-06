@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Capabilities
   ( capsToJson,
     Capabilities (..),
@@ -34,8 +31,10 @@ import Data.Aeson.Types
     (.:?),
   )
 import Utils (opt)
-import Prelude hiding (Proxy)
-import GHC.Generics
+import GHC.Generics ( Generic )
+import Data.Maybe (catMaybes)
+import Data.Bool (bool)
+import Control.Applicative (Alternative(..))
 
 
 minCapabilities :: BrowserName -> Capabilities

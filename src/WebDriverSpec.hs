@@ -42,7 +42,7 @@ module WebDriverSpec
     back,
     forward,
     refresh,
-    -- newSessionSpec,
+    newSession,
     newSession',
     deleteSession,
     getActiveElement,
@@ -51,7 +51,6 @@ module WebDriverSpec
     switchToWindow,
     navigateTo,
     findElement,
-    -- findElement',
     getWindowRect,
     elementClick,
     getElementText,
@@ -103,10 +102,20 @@ import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Text qualified as T
 import PyrethrumExtras (toS)
-import Prelude hiding (Down, get, id)
+import Prelude hiding (id, lookup)
 import Utils (opt)
-import Capabilities (Timeouts (..))
-import Data.Text (Text)
+import Capabilities (Timeouts (..), Capabilities, capsToJson)
+import Data.Text (Text, pack)
+import Data.Word (Word16)
+import Data.Set (Set)
+import GHC.Generics ( Generic )
+import Data.Maybe (catMaybes, mapMaybe)
+import Data.Foldable (toList)
+import Data.Function ((&))
+
+
+txt :: Show a => a -> Text
+txt = pack . show
 
 data W3Spec a
   = Get
@@ -178,7 +187,7 @@ data SameSite
 
 instance ToJSON SameSite where
   toJSON :: SameSite -> Value
-  toJSON = String . show
+  toJSON = String . txt
 
 data FrameReference
   = TopLevelFrame
@@ -315,8 +324,8 @@ POST 	/session/{session id}/print 	Print Page
 -- Method 	URI Template 	Command
 
 -- -- TODO: native capabilities type - change this to use type
--- newSession :: Capabilities -> W3Spec SessionId
--- newSession capabilities = newSessionSpec' $ capsToJson capabilities
+newSession :: Capabilities -> W3Spec SessionId
+newSession capabilities = newSession' $ capsToJson capabilities
 
 -- POST 	/session 	New Session
 newSession' :: Value -> W3Spec SessionId
@@ -846,12 +855,12 @@ data Pointer
   | Touch
   deriving (Show, Eq)
 
-mkLwrString :: (Show a) => a -> Value
-mkLwrString = String . T.toLower . show
+mkLwrTxt :: (Show a) => a -> Value
+mkLwrTxt = String . T.toLower . txt
 
 instance ToJSON Pointer where
   toJSON :: Pointer -> Value
-  toJSON = mkLwrString
+  toJSON = mkLwrTxt
 
 data PointerOrigin
   = Viewport

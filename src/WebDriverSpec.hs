@@ -103,7 +103,7 @@ import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Text qualified as T
 import PyrethrumExtras (toS)
 import Prelude hiding (id, lookup)
-import Utils (opt)
+import Utils (opt, txt)
 import Capabilities (Timeouts (..), Capabilities, capsToJson)
 import Data.Text (Text, pack)
 import Data.Word (Word16)
@@ -112,10 +112,6 @@ import GHC.Generics ( Generic )
 import Data.Maybe (catMaybes, mapMaybe)
 import Data.Foldable (toList)
 import Data.Function ((&))
-
-
-txt :: Show a => a -> Text
-txt = pack . show
 
 data W3Spec a
   = Get

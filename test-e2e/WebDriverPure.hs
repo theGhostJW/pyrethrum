@@ -32,6 +32,7 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Encoding qualified as E
 import Data.Text.IO qualified as T
+import Data.Text (Text)
 
 {- Pure types and functions used in Webdriver -}
 

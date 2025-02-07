@@ -74,53 +74,32 @@ common commonExtensions
       TypeFamilyDependencies
       TypeOperators
 
+common commonGhcOptions
+  ghc-options:
+    -fmax-pmcheck-models=10000000 -ferror-spans -O2 -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
 
-
--- common pyrethrumProps
+-- waiting on bug fix to start using these
+-- in the mean time using a shared folder
+-- library utils
+--   import: commonExtensions
+--   exposed-modules:
+--       Utils
 --   hs-source-dirs:
---     src
+--       utils-src
 --   build-depends:
---     deepseq
---     , unordered-containers
---     , template-haskell
---     , fmt
-
-
--- common reludeImports
---   build-depends:
---    base
---    , relude
---    , pyrethrum-extras
---   mixins:
---     base hiding (Prelude),
---     relude (Relude as Prelude, Data.Text, Relude.Unsafe as Unsafe)
-
--- flag optimised
---   description: is the exe optimised
---   manual: True
---   default: False
-library utils
-  import: commonExtensions
-  exposed-modules:
-      Utils
-  -- other-modules:
-  --     UtilsPure
-  hs-source-dirs:
-      utils-src
-  build-depends:
-    , base
-    , aeson
-
+--     , base
+--     , aeson
 
 library
-  import: commonExtensions
+  import: commonExtensions, commonGhcOptions
   exposed-modules:
       Capabilities
       WebDriverSpec
   hs-source-dirs:
       src
-  ghc-options: 
-    -fmax-pmcheck-models=10000000 -ferror-spans -O2 -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
+      utils-src
+  other-modules:
+      Utils
   build-depends:
     , base
     , aeson
@@ -130,78 +109,56 @@ library
     , pyrethrum-extras
     , text
     , containers
-    , pyrethrum:utils
-
-
-    -- , chronos
-    -- , deepseq
-    -- , directory
-    -- , dlist
-    -- , effectful
-    -- , effectful-core
-    -- , effectful-plugin
-    -- , effectful-th
-    -- , exceptions
-    -- , extra
-    -- , fmt
-    -- , hashable
-    -- , mtl
-    -- , path
-    -- , path-io
-    -- , pretty-show
-    -- , random
-    -- , raw-strings-qq
-    -- , req
-    -- , template-haskell
-    -- , text
-    -- , time
-    -- , transformers-either
-    -- , unliftio
-    -- , unordered-containers
-    -- , yaml
   default-language: Haskell2010
 
+test-suite test
+  import: commonExtensions, commonGhcOptions
+  type: exitcode-stdio-1.0
+  main-is: Driver.hs
+  hs-source-dirs:
+      test
+  build-depends:
+    , base
+    , tasty
+    , tasty-hunit
+    , tasty-discover
+    , bytestring
+    , falsify
+    , pyrethrum
+  other-modules:
+      ApiCoverageTest
+  build-tool-depends:
+    tasty-discover:tasty-discover
 
--- test-suite test
---   import: pyrethrumProps, reludeImports
---   type: exitcode-stdio-1.0
---   main-is: test/Main.hs
---   hs-source-dirs:
---       test
---     , tasty
---     , tasty-hunit
---     , tasty-hedgehog
---     , tasty-discover
---     , hedgehog
---     , bytestring
---     , falsify
---   default-extensions:
---       AllowAmbiguousTypes
---       BangPatterns
---       BlockArguments
---       ConstrainedClassMethods
---       ConstraintKinds
---       DisambiguateRecordFields
---       DuplicateRecordFields
---       DataKinds
---       DefaultSignatures
---       DeriveFoldable
---       DeriveFunctor
---       DeriveGeneric
---       DeriveLift
---       DeriveTraversable
---       DerivingStrategies
---       EmptyCase
---       ExistentialQuantification
---       ExtendedDefaultRules
---       FlexibleContexts
---       FlexibleInstances
---       FunctionalDependencies
---       GADTs
---       GeneralizedNewtypeDeriving
---       ImportQualifiedPost
---       InstanceSigs
---       KindSignatures
---     build-depends:
+test-suite test-e2e
+  import: commonExtensions, commonGhcOptions
+  type: exitcode-stdio-1.0
+  main-is: Driver.hs
+  hs-source-dirs:
+      test-e2e
+      utils-src
+  build-depends:
+    , base
+    , text
+    , aeson
+    , aeson-pretty
+    , req
+    , containers
+    , tasty
+    , tasty-hunit
+    , tasty-discover
+    , bytestring
+    , falsify
+    , pyrethrum
+  other-modules:
+      WebDriverPlainIODemo
+    , WebDriverPure
+    , WebDriverDemoUtils
+    , WebDriverIO
+    , Utils
+    , ApiCoverageTest 
+  build-tool-depends:
+    tasty-discover:tasty-discover
+
 
   

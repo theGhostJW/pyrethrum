@@ -3,7 +3,6 @@ module WebDriverPlainIODemo where
 import Data.Aeson (Value (..))
 import Data.Set qualified as Set
 import Data.Text.IO qualified as TIO
-import PyrethrumExtras (txt)
 import WebDriverDemoUtils
   ( alertsUrl,
     anyElmCss,
@@ -105,7 +104,10 @@ import WebDriverIO
     takeScreenshot, WheelAction (..), releaseActions,
   )
 import WebDriverPure (seconds, second)
-import Prelude hiding (Down, second)
+import Prelude hiding (Down, second, log)
+import Data.Text (Text)
+import Utils (txt)
+import Control.Monad (forM_)
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn

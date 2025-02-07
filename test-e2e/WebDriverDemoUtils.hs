@@ -1,6 +1,7 @@
 module WebDriverDemoUtils where
 
 import WebDriverSpec (Selector (CSS, XPath))
+import Data.Text (Text)
 
 
 -- ################### Effectful Demo ##################

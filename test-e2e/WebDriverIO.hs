@@ -107,13 +107,12 @@ import Network.HTTP.Req as R
     runReq,
     (/:),
   )
-import PyrethrumExtras (getLenient, toS, txt)
-import UnliftIO.Concurrent (threadDelay)
 import WebDriverPure (RequestArgs (..), prettyPrintJson, parseJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (get, second)
 import Capabilities (Capabilities, capsToJson, minFirefoxCapabilities)
+import Data.Text (Text)
 
 -- ############# IO Implementation #############
 
@@ -121,7 +120,7 @@ status :: IO DriverStatus
 status = run W.status
 
 newSession :: Capabilities -> IO SessionId
-newSession = run . W.newSession' . capsToJson
+newSession = run . W.newSession
 
 getTimeouts :: SessionId -> IO W.Timeouts
 getTimeouts = run . W.getTimeouts
@@ -343,8 +342,8 @@ parseIO spec r =
       (fail . toS $ spec.description <> "\n" <> "Failed to parse response:\n " <> txt r)
       pure
 
-devLog :: (MonadIO m) => Text -> m ()
-devLog = liftIO . T.putStrLn
+devLog :: Text -> IO ()
+devLog = T.putStrLn
 
 callWebDriver :: Bool -> RequestArgs -> IO HttpResponse
 callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =

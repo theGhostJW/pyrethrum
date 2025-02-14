@@ -39,7 +39,7 @@ import WebDriverIO
     Selector (..),
     SessionId (..),
     Timeouts (..),
-    WindowHandle (..),
+    WindowHandleSpec (..),
     WindowRect (..),
     acceptAlert,
     addCookie,
@@ -104,7 +104,7 @@ import WebDriverIO
     takeScreenshot, WheelAction (..), releaseActions,
   )
 import WebDriverPure (seconds, second)
-import Prelude hiding (Down, second, log)
+import Prelude hiding (log)
 import Data.Text (Text)
 import Utils (txt)
 import Control.Monad (forM_)
@@ -134,7 +134,7 @@ mkExtendedTimeoutsSession :: IO SessionId
 mkExtendedTimeoutsSession = do
   ses <- minFirefoxSession
   setTimeouts ses $
-    Timeouts
+    MkTimeouts
       { pageLoad = Just $ 30 * seconds,
         script = Just $  11 * seconds,
         implicit = Just $ 12 * seconds
@@ -288,7 +288,7 @@ demoTimeouts = do
   ---
   logShowM "timeouts" $ getTimeouts ses
   setTimeouts ses $
-    Timeouts
+    MkTimeouts
       { pageLoad = Just $ 50 * seconds,
         script = Just $ 11 * seconds,
         implicit = Just $ 12 * seconds

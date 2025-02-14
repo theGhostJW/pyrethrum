@@ -2,7 +2,7 @@
 
 module WebDriverIO
   ( W.Timeouts (..),
-    W.WindowHandle (..),
+    W.WindowHandleSpec (..),
     W.SameSite(..),
     W.Selector(..),
     W.SessionId (..),
@@ -152,7 +152,7 @@ getWindowRect = run . W.getWindowRect
 getWindowHandles :: SessionId -> IO [Text]
 getWindowHandles = run . W.getWindowHandles
 
-newWindow :: SessionId -> IO W.WindowHandle
+newWindow :: SessionId -> IO W.WindowHandleSpec
 newWindow = run . W.newWindow
 
 switchToWindow :: SessionId -> Text -> IO ()

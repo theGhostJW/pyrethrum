@@ -10,7 +10,7 @@ module WebDriverSpec
     Selector (..),
     Cookie (..),
     Timeouts (..),
-    WindowHandle (..),
+    WindowHandleSpec (..),
     FrameReference (..),
     WindowRect (..),
     --- actions
@@ -94,9 +94,16 @@ import Data.Aeson
   ( Key,
     KeyValue ((.=)),
     ToJSON (toJSON),
+    FromJSON(..),
     Value (..),
-    object, fromJSON, Result (..),
+    object, 
+    fromJSON, 
+    Result (..),
+    (.:),
+    withObject,
+    withText
   )
+import Data.Aeson.Types (Parser)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.KeyMap qualified as AKM
 import Data.ByteString.Lazy.Char8 (unpack)
@@ -117,23 +124,23 @@ data W3Spec a
   = Get
       { description :: Text,
         path :: [Text],
-        parser :: HttpResponse -> Maybe a
+        parser :: HttpResponse -> Result a
       }
   | Post
       { description :: Text,
         path :: [Text],
         body :: Value,
-        parser :: HttpResponse -> Maybe a
+        parser :: HttpResponse -> Result a
       }
   | PostEmpty
       { description :: Text,
         path :: [Text],
-        parser :: HttpResponse -> Maybe a
+        parser :: HttpResponse -> Result a
       }
   | Delete
       { description :: Text,
         path :: [Text],
-        parser :: HttpResponse -> Maybe a
+        parser :: HttpResponse -> Result a
       }
 
 instance (Show a) => Show (W3Spec a) where
@@ -155,11 +162,47 @@ data HttpResponse = Response
   }
   deriving (Show)
 
-data WindowHandle = Handle
-  { handle :: Text,
-    handletype :: Text
+newtype WindowHandle =  Handle {handle :: Text}
+  deriving (Show, Eq)
+
+
+data WindowHandleSpec = HandleSpec
+  { handle :: WindowHandle,
+    handletype :: HandleType
   }
   deriving (Show, Eq)
+
+instance ToJSON WindowHandleSpec where
+  toJSON :: WindowHandleSpec -> Value
+  toJSON HandleSpec {handle, handletype} =
+    object
+      [ "handle" .= handle.handle,
+        "type" .= handletype
+      ]
+
+instance FromJSON WindowHandleSpec where
+   parseJSON :: Value -> Parser WindowHandleSpec
+   parseJSON = withObject "WindowHandleSpec" $ \v -> do
+    handle <- Handle <$> v .: "handle"
+    handletype <- v .: "type"
+    pure $ HandleSpec {..}
+
+data HandleType
+  = Window
+  | Tab
+  deriving (Show, Eq)
+
+instance ToJSON HandleType where
+  toJSON :: HandleType -> Value
+  toJSON = String . T.toLower . pack . show
+
+instance FromJSON HandleType where
+  parseJSON :: Value -> Parser HandleType
+  parseJSON = withText "HandleType" $ \case
+    "window" -> pure Window
+    "tab" -> pure Tab
+    v -> fail $ "Unknown HandleType " <> unpack (encodePretty v) 
+   
 
 newtype ElementId = Element {id :: Text}
   deriving (Show, Eq, Generic)
@@ -249,7 +292,7 @@ data Selector
 -- ########################### WebDriver API ############################
 -- ######################################################################
 {- FUll List
-https://www.w3.org/TR/2024/WD-webdriver2-20241212/#endpoints
+https://w3c.github.io/webdriver/#endpoints - W3C Editor's Draft 10 February 2025
 61 endpoints
 Method 	URI Template 	Command
 POST 	/session 	New Session
@@ -341,7 +384,7 @@ getTimeouts sessionRef = Get "Get Timeouts" (sessionUri1 sessionRef "timeouts") 
 
 -- POST 	/session/{session id}/timeouts 	Set Timeouts
 setTimeouts :: SessionId -> Timeouts -> W3Spec ()
-setTimeouts sessionRef Timeouts {implicit, pageLoad, script} =
+setTimeouts sessionRef MkTimeouts {implicit, pageLoad, script} =
   Post "Set Timeouts" (sessionUri1 sessionRef "timeouts") (object ["implicit" .= implicit, "pageLoad" .= pageLoad, "script" .= script]) voidParser
 
 -- POST 	/session/{session id}/url 	Navigate To
@@ -373,7 +416,7 @@ getWindowHandle :: SessionId -> W3Spec Text
 getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") parseBodyTxt
 
 -- POST 	/session/{session id}/window/new 	New Window
-newWindow :: SessionId -> W3Spec WindowHandle
+newWindow :: SessionId -> W3Spec WindowHandleSpec
 newWindow sessionRef = PostEmpty "New Window" (sessionUri2 sessionRef "window" "new") windowHandleParser
 
 -- DELETE 	/session/{session id}/window 	Close Window
@@ -595,15 +638,12 @@ instance ToJSON WindowRect where
         "height" .= height
       ]
 
-parseTimeouts :: HttpResponse -> Maybe Timeouts
+parseTimeouts :: HttpResponse -> Result Timeouts
 parseTimeouts r = do 
   r' <- bodyValue r
-  let rslt = fromJSON r' 
-  case rslt of 
-    Success a -> Just a
-    Error _ -> Nothing
+  fromJSON r' 
 
-parseWindowRect :: HttpResponse -> Maybe WindowRect
+parseWindowRect :: HttpResponse -> Result WindowRect
 parseWindowRect r =
   Rect
     <$> bdyInt "x"
@@ -617,45 +657,54 @@ mkScript :: Text -> [Value] -> Value
 mkScript script args = object ["script" .= script, "args" .= args]
 
 
-windowHandleParser :: HttpResponse -> Maybe WindowHandle
+windowHandleParser :: HttpResponse -> Result WindowHandleSpec
 windowHandleParser r =
   bodyValue r
-    >>= windowHandleFromValue
+    >>= fromJSON
 
-windowHandlesParser :: HttpResponse -> Maybe [Text]
+windowHandlesParser :: HttpResponse -> Result [Text]
 windowHandlesParser r = do
   bodyValue r
     >>= \case
-      Array a -> Just $ catMaybes $ toList $ asText <$> a
-      _ -> Nothing
+      Array a -> sequence . toList $ asText <$> a
+      v -> aesonTypeError "Array" v
 
-windowHandleFromValue :: Value -> Maybe WindowHandle
-windowHandleFromValue v =
-  liftA2 Handle (lookupTxt "handle" v) (lookupTxt "type" v)
+-- windowHandleFromValue :: Value -> Maybe WindowHandleSpec
+-- windowHandleFromValue v =
+--   liftA2 HandleSpec (Handle <$> lookupTxt "handle" v) ( <$> lookupTxt "type" v)
 
-parseCookies :: HttpResponse -> Maybe [Cookie]
+parseCookies :: HttpResponse -> Result [Cookie]
 parseCookies r =
   bodyValue r
     >>= \case
-      Array a -> Just $ mapMaybe cookieFromBody (toList a)
-      _ -> Nothing
+      Array a ->  mapM cookieFromBody (toList a)
+      v -> aesonTypeError "Array" v
 
-parseCookie :: HttpResponse -> Maybe Cookie
+parseCookie :: HttpResponse -> Result Cookie
 parseCookie r =
   bodyValue r
     >>= cookieFromBody
 
-cookieFromBody :: Value -> Maybe Cookie
-cookieFromBody b = do
-  name <- lookupTxt "name" b
-  value <- lookupTxt "value" b
-  let path = lookupTxt "path" b
-      domain = lookupTxt "domain" b
-      secure = lookupBool "secure" b
-      httpOnly = lookupBool "httpOnly" b
-      sameSite = lookupSameSite "sameSite" b
-      expiry = lookupInt "expiry" b
-  pure $ Cookie {..}
+cookieFromBody :: Value -> Result Cookie
+cookieFromBody b = case b of
+  Object kv -> do
+    name <- lookupTxt "name" b
+    value <- lookupTxt "value" b
+    path <- opt' "path" 
+    domain <- opt' "domain" 
+    secure <- optBool  "secure" 
+    httpOnly <- optBool "httpOnly" 
+    sameSite <- optBase toSameSite "sameSite" 
+    expiry <- optInt "expiry" 
+    pure $ Cookie {..}
+    where 
+      optBase :: (Value -> Result a) -> Key -> Result (Maybe a)
+      optBase typeCaster k = AKM.lookup k kv & maybe (Success Nothing) (fmap Just . typeCaster)
+      opt' = optBase asText
+      optInt = optBase asInt 
+      optBool = optBase asBool
+  v -> aesonTypeError "Object" v
+
 
 selectorJson :: Selector -> Value
 selectorJson = \case
@@ -667,79 +716,95 @@ selectorJson = \case
   where
     sJSON using value = object ["using" .= using, "value" .= value]
 
-voidParser :: HttpResponse -> Maybe ()
-voidParser _ = Just ()
+voidParser :: HttpResponse -> Result ()
+voidParser _ = pure ()
 
-bodyText' :: Maybe Value -> Key -> Maybe Text
+bodyText' :: Result Value -> Key -> Result Text
 bodyText' v k = v >>= lookupTxt k
 
-bodyText :: HttpResponse -> Key -> Maybe Text
+bodyText :: HttpResponse -> Key -> Result Text
 bodyText r = bodyText' (bodyValue r)
 
-bodyInt' :: Maybe Value -> Key -> Maybe Int
+bodyInt' :: Result Value -> Key -> Result Int
 bodyInt' v k = v >>= lookupInt k
 
-bodyInt :: HttpResponse -> Key -> Maybe Int
+bodyInt :: HttpResponse -> Key -> Result Int
 bodyInt r = bodyInt' (bodyValue r)
 
-parseBodyTxt :: HttpResponse -> Maybe Text
+parseBodyTxt :: HttpResponse -> Result Text
 parseBodyTxt r = bodyValue r >>= asText
 
-parseBodyBool :: HttpResponse -> Maybe Bool
+parseBodyBool :: HttpResponse -> Result Bool
 parseBodyBool r =
-  bodyValue r >>= \case
-    Bool b -> Just b
-    _ -> Nothing
+  bodyValue r >>= asBool
 
-parseElementsRef :: HttpResponse -> Maybe [ElementId]
+asBool :: Value -> Result Bool
+asBool = \case
+  Bool b -> Success b
+  v -> aesonTypeError "Bool" v
+
+parseElementsRef :: HttpResponse -> Result [ElementId]
 parseElementsRef r =
   bodyValue r
     >>= \case
-      Array a -> Just $ mapMaybe elemtRefFromBody (toList a)
-      _ -> Nothing
+      Array a -> mapM elemtRefFromBody $ toList a
+      v -> aesonTypeError "Array" v
 
 -- TODO Aeson helpers separate module
-lookup :: Key -> Value -> Maybe Value
+lookup :: Key -> Value -> Result Value
 lookup k = \case
-  Object o -> AKM.lookup k o
-  _ -> Nothing
+  Object o -> AKM.lookup k o & maybe (Error ("the key: " <> show k <> "does not exist in the object:\n" <> toS (encodePretty o))) pure
+  v -> aesonTypeError "Object" v
 
-lookupTxt :: Key -> Value -> Maybe Text
+lookupTxt :: Key -> Value -> Result Text
 lookupTxt k v = lookup k v >>= asText
 
-lookupBool :: Key -> Value -> Maybe Bool
+lookupBool :: Key -> Value -> Result Bool
 lookupBool k v =
   lookup k v >>= \case
-    Bool b -> Just b
-    _ -> Nothing
+    Bool b -> Success b
+    _ -> aesonTypeError "Bool" v
 
-lookupSameSite :: Key -> Value -> Maybe SameSite
+lookupSameSite :: Key -> Value -> Result SameSite
 lookupSameSite k v =
-  lookup k v >>= \case
-    String "Lax" -> Just Lax
-    String "Strict" -> Just Strict
-    String "None" -> Just None
-    _ -> Nothing
+  lookup k v >>= toSameSite
 
-lookupInt :: Key -> Value -> Maybe Int
+toSameSite :: Value -> Result SameSite
+toSameSite = \case
+  String "Lax" -> Success Lax
+  String "Strict" -> Success Strict
+  String "None" -> Success None
+  v -> aesonTypeError' "SameSite" "Expected one of: Lax, Strict, None" v
+
+lookupInt :: Key -> Value -> Result Int
 lookupInt k v = lookup k v >>= asInt
 
-asText :: Value -> Maybe Text
+aeasonTypeErrorMessage :: Text -> Value -> Text
+aeasonTypeErrorMessage t v = "Expected Json Value to be of type: " <> t <> "\nbut got:\n" <> toS (encodePretty v)
+
+aesonTypeError :: Text -> Value -> Result a
+aesonTypeError t v = Error . toS $ aeasonTypeErrorMessage t v
+
+aesonTypeError' :: Text -> Text ->  Value -> Result a
+aesonTypeError' typ info v = Error . toS $ aeasonTypeErrorMessage typ v <> "\n" <> info
+
+
+asText :: Value -> Result Text
 asText = \case
-  String t -> Just t
-  _ -> Nothing
+  String t -> Success t
+  v -> aesonTypeError "Text" v
 
-asInt :: Value -> Maybe Int
+asInt :: Value -> Result Int
 asInt = \case
-  Number t -> Just $ floor t
-  _ -> Nothing
+  Number t -> Success $ floor t
+  v -> aesonTypeError "Int" v
 
-parseSessionRef :: HttpResponse -> Maybe SessionId
+parseSessionRef :: HttpResponse -> Result SessionId
 parseSessionRef r =
   Session
     <$> bodyText r "sessionId"
 
-bodyValue :: HttpResponse -> Maybe Value
+bodyValue :: HttpResponse -> Result Value
 bodyValue r = lookup "value" r.body
 
 -- https://www.w3.org/TR/webdriver2/#elements
@@ -750,15 +815,15 @@ elementFieldName = "element-6066-11e4-a52e-4f735466cecf"
 shadowRootFieldName :: Key
 shadowRootFieldName = "shadow-6066-11e4-a52e-4f735466cecf"
 
-parseElementRef :: HttpResponse -> Maybe ElementId
+parseElementRef :: HttpResponse -> Result ElementId
 parseElementRef r =
   Element <$> bodyText r elementFieldName
 
-parseShadowElementRef :: HttpResponse -> Maybe ElementId
+parseShadowElementRef :: HttpResponse -> Result ElementId
 parseShadowElementRef r =
   Element <$> bodyText r shadowRootFieldName
 
-elemtRefFromBody :: Value -> Maybe ElementId
+elemtRefFromBody :: Value -> Result ElementId
 elemtRefFromBody b = Element <$> lookupTxt elementFieldName b
 
 session :: Text
@@ -792,9 +857,9 @@ mkShowable = \case
   PostEmpty d p _ -> Request d "POST" p Nothing
   Delete d p _ -> Request d "DELETE" p Nothing
 
-parseDriverStatus :: HttpResponse -> Maybe DriverStatus
+parseDriverStatus :: HttpResponse -> Result DriverStatus
 parseDriverStatus Response {statusCode, statusMessage} =
-  Just $
+  Success $
     statusCode & \case
       200 -> Ready
       500 -> ServiceError {statusCode, statusMessage}

@@ -181,7 +181,7 @@ instance FromJSON Proxy where
 
 
 -- Timeouts Configuration
-data Timeouts = Timeouts
+data Timeouts = MkTimeouts
   { implicit :: Maybe Int,
     pageLoad :: Maybe Int,
     script :: Maybe Int
@@ -282,7 +282,7 @@ vendorSpecificToJSON = maybe [] vendorSpecificToJSON'
 
 instance ToJSON Timeouts where
   toJSON :: Timeouts -> Value
-  toJSON Timeouts {..} =
+  toJSON MkTimeouts {..} =
     object
       [ "script" .= script,
         "pageLoad" .= pageLoad,
@@ -390,7 +390,7 @@ parseVendorSpecific v =
 instance FromJSON Timeouts where
   parseJSON :: Value -> Parser Timeouts
   parseJSON = withObject "Timeouts" $ \v ->
-    Timeouts
+    MkTimeouts
       <$> v .:? "script"
       <*> v .:? "pageLoad"
       <*> v .:? "implicit"

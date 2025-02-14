@@ -1,4 +1,7 @@
-module Utils where
+module Utils (
+  opt,
+  txt
+) where
 
 import Data.Aeson
   ( Key,
@@ -7,7 +10,6 @@ import Data.Aeson
   )
 
 import Data.Text (Text, pack)
--- Utility functions will be added here
 
 opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
 opt lbl mb = (lbl .=) <$> mb

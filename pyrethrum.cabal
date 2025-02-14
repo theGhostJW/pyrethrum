@@ -116,15 +116,18 @@ test-suite test
   type: exitcode-stdio-1.0
   main-is: Driver.hs
   hs-source-dirs:
-      test
+      test,
+      utils-src
   build-depends:
     , base
+    , text
     , tasty
     , tasty-hunit
     , tasty-discover
     , bytestring
     , falsify
     , pyrethrum
+    , raw-strings-qq
   other-modules:
       ApiCoverageTest
   build-tool-depends:
@@ -150,6 +153,7 @@ test-suite test-e2e
     , bytestring
     , falsify
     , pyrethrum
+    , raw-strings-qq
   other-modules:
       WebDriverPlainIODemo
     , WebDriverPure

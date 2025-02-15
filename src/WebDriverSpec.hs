@@ -116,7 +116,7 @@ import Data.Text (Text, pack)
 import Data.Word (Word16)
 import Data.Set (Set)
 import GHC.Generics ( Generic )
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes)
 import Data.Foldable (toList)
 import Data.Function ((&))
 
@@ -278,7 +278,6 @@ instance ToJSON Cookie where
 cookieJSON :: Cookie -> Value
 cookieJSON c = object ["cookie" .= c]
 
--- TODO: add more selector types
 data Selector
   = CSS Text
   | XPath Text
@@ -752,22 +751,22 @@ parseElementsRef r =
 
 -- TODO Aeson helpers separate module
 lookup :: Key -> Value -> Result Value
-lookup k = \case
-  Object o -> AKM.lookup k o & maybe (Error ("the key: " <> show k <> "does not exist in the object:\n" <> toS (encodePretty o))) pure
-  v -> aesonTypeError "Object" v
+lookup k v = v & \case
+  Object o -> AKM.lookup k o & maybe (Error ("the key: " <> show k <> "does not exist in the object:\n" <> jsonPrettyString v)) pure
+  _ -> aesonTypeError "Object" v
 
 lookupTxt :: Key -> Value -> Result Text
 lookupTxt k v = lookup k v >>= asText
 
-lookupBool :: Key -> Value -> Result Bool
-lookupBool k v =
-  lookup k v >>= \case
-    Bool b -> Success b
-    _ -> aesonTypeError "Bool" v
+-- lookupBool :: Key -> Value -> Result Bool
+-- lookupBool k v =
+--   lookup k v >>= \case
+--     Bool b -> Success b
+--     _ -> aesonTypeError "Bool" v
 
-lookupSameSite :: Key -> Value -> Result SameSite
-lookupSameSite k v =
-  lookup k v >>= toSameSite
+-- lookupSameSite :: Key -> Value -> Result SameSite
+-- lookupSameSite k v =
+--   lookup k v >>= toSameSite
 
 toSameSite :: Value -> Result SameSite
 toSameSite = \case
@@ -780,7 +779,7 @@ lookupInt :: Key -> Value -> Result Int
 lookupInt k v = lookup k v >>= asInt
 
 aeasonTypeErrorMessage :: Text -> Value -> Text
-aeasonTypeErrorMessage t v = "Expected Json Value to be of type: " <> t <> "\nbut got:\n" <> toS (encodePretty v)
+aeasonTypeErrorMessage t v = "Expected Json Value to be of type: " <> t <> "\nbut got:\n" <> jsonPretty v
 
 aesonTypeError :: Text -> Value -> Result a
 aesonTypeError t v = Error . toS $ aeasonTypeErrorMessage t v
@@ -850,10 +849,16 @@ elementUri1 sr er sp = [session, sr.id, "element", er.id, sp]
 elementUri2 :: SessionId -> ElementId -> Text -> Text -> [Text]
 elementUri2 sr er sp sp2 = [session, sr.id, "element", er.id, sp, sp2]
 
+jsonPretty :: Value -> Text
+jsonPretty = toS . jsonPrettyString
+
+jsonPrettyString :: Value -> String
+jsonPrettyString = unpack . encodePretty
+
 mkShowable :: W3Spec a -> W3SpecShowable
 mkShowable = \case
   Get d p _ -> Request d "GET" p Nothing
-  Post d p b _ -> Request d "POST" p (Just . toS . unpack $ encodePretty b)
+  Post d p b _ -> Request d "POST" p (Just $ jsonPretty b)
   PostEmpty d p _ -> Request d "POST" p Nothing
   Delete d p _ -> Request d "DELETE" p Nothing
 

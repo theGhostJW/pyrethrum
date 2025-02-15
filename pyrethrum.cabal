@@ -129,6 +129,7 @@ test-suite test
     , pyrethrum
     , raw-strings-qq
   other-modules:
+      Utils
       ApiCoverageTest
   build-tool-depends:
     tasty-discover:tasty-discover

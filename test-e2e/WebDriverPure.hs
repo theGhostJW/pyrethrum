@@ -87,7 +87,7 @@ prettyPrintJson = T.putStrLn . jsonToText
 
 parseJson :: Text -> Either String Value
 parseJson input =
-  eitherDecodeStrict (encodeUtf8 input)
+  eitherDecodeStrict (E.encodeUtf8 input)
 
 
 

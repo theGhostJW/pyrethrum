@@ -3,19 +3,20 @@
 module WebDriverIO
   ( W.Timeouts (..),
     W.WindowHandleSpec (..),
-    W.SameSite(..),
-    W.Selector(..),
+    W.WindowHandle(..),
+    W.SameSite (..),
+    W.Selector (..),
     W.SessionId (..),
     W.FrameReference (..),
     W.WindowRect (..),
     W.Cookie (..),
-    W.PointerOrigin(..),
-    W.Action(..),
-    W.Actions(..),
-    W.KeyAction(..),
-    W.Pointer(..),
-    W.PointerAction(..),
-    W.WheelAction(..),
+    W.PointerOrigin (..),
+    W.Action (..),
+    W.Actions (..),
+    W.KeyAction (..),
+    W.Pointer (..),
+    W.PointerAction (..),
+    W.WheelAction (..),
     status,
     findElementFromElement,
     findElementsFromElement,
@@ -80,13 +81,22 @@ module WebDriverIO
     dismissAlert,
     acceptAlert,
     getAlertText,
-    sendAlertText
+    sendAlertText,
   )
 where
 
 -- import Effectful.Reader.Dynamic
 
-import Data.Aeson (Value, object)
+import Capabilities (Capabilities, minFirefoxCapabilities)
+import Control.Concurrent (threadDelay)
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
+import Data.Aeson (Result (..), Value, object)
+import Data.Either (fromRight)
+import Data.Foldable (foldl')
+import Data.Function ((&))
+import Data.Text (Text, unpack)
+import Data.Text.Encoding (decodeUtf8Lenient)
 import Data.Text.IO qualified as T
 import Network.HTTP.Req as R
   ( DELETE (DELETE),
@@ -107,12 +117,12 @@ import Network.HTTP.Req as R
     runReq,
     (/:),
   )
-import WebDriverPure (RequestArgs (..), prettyPrintJson, parseJson)
+import Utils (txt)
+import WebDriverPure (RequestArgs (..), parseJson, prettyPrintJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
-import Prelude hiding (get, second)
-import Capabilities (Capabilities, capsToJson, minFirefoxCapabilities)
-import Data.Text (Text)
+import Prelude hiding (log)
+import Network.HTTP.Req (JsonResponse)
 
 -- ############# IO Implementation #############
 
@@ -155,7 +165,7 @@ getWindowHandles = run . W.getWindowHandles
 newWindow :: SessionId -> IO W.WindowHandleSpec
 newWindow = run . W.newWindow
 
-switchToWindow :: SessionId -> Text -> IO ()
+switchToWindow :: SessionId -> W.WindowHandle -> IO ()
 switchToWindow s = run . W.switchToWindow s
 
 switchToFrame :: SessionId -> W.FrameReference -> IO ()
@@ -287,7 +297,7 @@ deleteAllCookies = run . W.deleteAllCookies
 dismissAlert :: SessionId -> IO ()
 dismissAlert = run . W.dismissAlert
 
-acceptAlert:: SessionId -> IO ()
+acceptAlert :: SessionId -> IO ()
 acceptAlert = run . W.acceptAlert
 
 getAlertText :: SessionId -> IO Text
@@ -301,7 +311,6 @@ performActions s = run . W.performActions s
 
 performActions' :: SessionId -> Text -> IO ()
 performActions' s = run . W.performActions' s . fromRight (error "FAILED") . parseJson
-
 
 releaseActions :: SessionId -> IO ()
 releaseActions = run . W.releaseActions
@@ -338,12 +347,15 @@ mkRequest = \case
 parseIO :: W3Spec a -> W.HttpResponse -> IO a
 parseIO spec r =
   spec.parser r
-    & maybe
-      (fail . toS $ spec.description <> "\n" <> "Failed to parse response:\n " <> txt r)
-      pure
+    & \case
+      Error msg -> fail $ unpack spec.description <> "\n" <> "Failed to parse response:\n " <> msg
+      Success a -> pure a
 
 devLog :: Text -> IO ()
 devLog = T.putStrLn
+
+responseStatusText :: Network.HTTP.Req.JsonResponse Value -> Text
+responseStatusText = decodeUtf8Lenient . responseStatusMessage
 
 callWebDriver :: Bool -> RequestArgs -> IO HttpResponse
 callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
@@ -353,19 +365,15 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     let fr =
           Response
             { statusCode = responseStatusCode r,
-              statusMessage = getLenient . toS $ responseStatusMessage r,
+              statusMessage = responseStatusText r,
               body = responseBody r :: Value
-              -- not used yet may be able to remove and reduce dependncies
-              -- headers = L.responseHeaders . toVanillaResponse $ r,
-              -- cookies = responseCookieJar r
             }
     log $ "Framework Response:\n" <> txt fr
     pure fr
   where
-    log = when wantLog . devLog
+    log m = liftIO $ when wantLog $ devLog m
     url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
-  
 
 --------------------------------------------------------------------------------
 -- console out (to haskell output window) for debugging

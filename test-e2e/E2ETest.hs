@@ -1,4 +1,4 @@
-module ApiCoverageTest where
+module E2ETest where
 
 import Test.Tasty.HUnit as HUnit
 

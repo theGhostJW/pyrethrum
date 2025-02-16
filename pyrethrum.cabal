@@ -76,7 +76,25 @@ common commonExtensions
 
 common commonGhcOptions
   ghc-options:
-    -fmax-pmcheck-models=10000000 -ferror-spans -O2 -fprint-potential-instances -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fwarn-tabs -fwrite-ide-info -fno-warn-type-defaults -fno-warn-unused-do-bind -Wno-overlapping-patterns -fprefer-byte-code -fbyte-code-and-object-code -fno-break-points -fdefer-type-errors
+    -fmax-pmcheck-models=10000000 
+    -ferror-spans 
+    -O2 
+    -fprint-potential-instances 
+    -Wall 
+    -Wcompat 
+    -Wincomplete-record-updates 
+    -Wincomplete-uni-patterns 
+    -Wredundant-constraints 
+    -fwarn-tabs 
+    -fwrite-ide-info 
+    -fno-warn-type-defaults 
+    -fno-warn-unused-do-bind 
+    -Wno-overlapping-patterns 
+    -fprefer-byte-code 
+    -fbyte-code-and-object-code 
+    -fno-break-points
+
+ -- -fdefer-type-errors
 
 -- waiting on bug fix to start using these
 -- in the mean time using a shared folder
@@ -94,16 +112,16 @@ library
   import: commonExtensions, commonGhcOptions
   exposed-modules:
       Capabilities
-      WebDriverSpec
+    , WebDriverSpec
   hs-source-dirs:
       src
-      utils-src
+    , utils-src
   other-modules:
       Utils
   build-depends:
-    , base
     , aeson
     , aeson-pretty
+    , base
     , base
     , bytestring
     , pyrethrum-extras
@@ -116,9 +134,10 @@ test-suite test
   type: exitcode-stdio-1.0
   main-is: Driver.hs
   hs-source-dirs:
-      test,
-      utils-src
+      test
+    , utils-src
   build-depends:
+    , aeson
     , base
     , text
     , tasty
@@ -130,7 +149,7 @@ test-suite test
     , raw-strings-qq
   other-modules:
       Utils
-      ApiCoverageTest
+    , ApiCoverageTest
   build-tool-depends:
     tasty-discover:tasty-discover
 
@@ -140,12 +159,12 @@ test-suite test-e2e
   main-is: Driver.hs
   hs-source-dirs:
       test-e2e
-      utils-src
+    , utils-src
   build-depends:
-    , base
-    , text
     , aeson
     , aeson-pretty
+    , base
+    , text
     , req
     , containers
     , tasty
@@ -161,7 +180,7 @@ test-suite test-e2e
     , WebDriverDemoUtils
     , WebDriverIO
     , Utils
-    , ApiCoverageTest 
+    , E2ETest 
   build-tool-depends:
     tasty-discover:tasty-discover
 

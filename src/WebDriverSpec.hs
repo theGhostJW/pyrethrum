@@ -11,6 +11,7 @@ module WebDriverSpec
     Cookie (..),
     Timeouts (..),
     WindowHandleSpec (..),
+    WindowHandle (..),
     FrameReference (..),
     WindowRect (..),
     --- actions
@@ -423,8 +424,8 @@ closeWindow :: SessionId -> W3Spec ()
 closeWindow sessionRef = Delete "Close Window" (sessionUri1 sessionRef "window") voidParser
 
 -- POST 	/session/{session id}/window 	Switch To Window
-switchToWindow :: SessionId -> Text -> W3Spec ()
-switchToWindow sessionRef handle = Post "Switch To Window" (sessionUri1 sessionRef "window") (object ["handle" .= handle]) voidParser
+switchToWindow :: SessionId -> WindowHandle -> W3Spec ()
+switchToWindow sessionRef Handle {handle} = Post "Switch To Window" (sessionUri1 sessionRef "window") (object ["handle" .= handle]) voidParser
 
 -- GET 	/session/{session id}/window/handles 	Get Window Handles
 getWindowHandles :: SessionId -> W3Spec [Text]

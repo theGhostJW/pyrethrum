@@ -27,7 +27,7 @@ import Network.HTTP.Req as R
     ProvidesBody,
   )
 
-import Prelude hiding (get, second)
+import Prelude
 import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Encoding qualified as E
@@ -54,9 +54,6 @@ hour = 60 * minutes
 
 hours :: Int
 hours = hour
-
-opt :: (Functor f, KeyValue e b, ToJSON a) => Key -> f a -> f b
-opt lbl mb = (lbl .=) <$> mb
 
 -- todo stand alone instance of Show
 data RequestArgs where

@@ -90,26 +90,12 @@ common commonGhcOptions
 
  -- -fdefer-type-errors
 
--- waiting on bug fix to start using these
--- in the mean time using a shared folder
--- library utils
---   import: commonExtensions
---   exposed-modules:
---       Utils
---   hs-source-dirs:
---       utils-src
---   build-depends:
---     , base
---     , aeson
-
 library
   import: commonExtensions, commonGhcOptions
   exposed-modules:
       Capabilities
     , WebDriverSpec
-  hs-source-dirs:
-      src
-    , utils-src
+  hs-source-dirs: src
   other-modules:
       Utils
   build-depends:
@@ -126,9 +112,7 @@ test-suite test
   import: commonExtensions, commonGhcOptions
   type: exitcode-stdio-1.0
   main-is: Driver.hs
-  hs-source-dirs:
-      test
-    , utils-src
+  hs-source-dirs: test
   build-depends:
     , aeson
     , base
@@ -150,9 +134,7 @@ test-suite test-e2e
   import: commonExtensions, commonGhcOptions
   type: exitcode-stdio-1.0
   main-is: Driver.hs
-  hs-source-dirs:
-      test-e2e
-    , utils-src
+  hs-source-dirs: test-e2e
   build-depends:
     , aeson
     , aeson-pretty
@@ -177,5 +159,3 @@ test-suite test-e2e
   build-tool-depends:
     tasty-discover:tasty-discover
 
-
-  

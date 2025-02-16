@@ -412,8 +412,8 @@ getTitle :: SessionId -> W3Spec Text
 getTitle sessionRef = Get "Get Title" (sessionUri1 sessionRef "title") parseBodyTxt
 
 -- GET 	/session/{session id}/window 	Get Window Handle
-getWindowHandle :: SessionId -> W3Spec Text
-getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") parseBodyTxt
+getWindowHandle :: SessionId -> W3Spec WindowHandle
+getWindowHandle sessionRef = Get "Get Window Handle" (sessionUri1 sessionRef "window") (fmap Handle . parseBodyTxt)
 
 -- POST 	/session/{session id}/window/new 	New Window
 newWindow :: SessionId -> W3Spec WindowHandleSpec

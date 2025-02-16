@@ -117,7 +117,7 @@ import Network.HTTP.Req as R
     runReq,
     (/:),
   )
-import Utils (txt)
+import Shared (txt)
 import WebDriverPure (RequestArgs (..), parseJson, prettyPrintJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
@@ -153,7 +153,7 @@ minimizeWindow = run . W.minimizeWindow
 fullScreenWindow :: SessionId -> IO W.WindowRect
 fullScreenWindow = run . W.fullscreenWindow
 
-getWindowHandle :: SessionId -> IO Text
+getWindowHandle :: SessionId -> IO W.WindowHandle
 getWindowHandle = run . W.getWindowHandle
 
 getWindowRect :: SessionId -> IO W.WindowRect

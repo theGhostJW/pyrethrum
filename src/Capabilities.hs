@@ -30,11 +30,11 @@ import Data.Aeson.Types
     (.:),
     (.:?),
   )
-import Utils (opt)
 import GHC.Generics ( Generic )
 import Data.Maybe (catMaybes)
 import Data.Bool (bool)
 import Control.Applicative (Alternative(..))
+import Utils (opt)
 
 
 minCapabilities :: BrowserName -> Capabilities

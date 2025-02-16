@@ -106,7 +106,7 @@ import WebDriverIO
 import WebDriverPure (seconds, second)
 import Prelude hiding (log)
 import Data.Text (Text)
-import Utils (txt)
+import Shared (txt)
 import Control.Monad (forM_)
 
 logTxt :: Text -> IO ()
@@ -205,13 +205,18 @@ demoForwardBackRefresh = do
 
   deleteSession ses
 
+-- >>> testEval
+testEval :: IO ()
+testEval = Prelude.putStrLn "testEval"
+
+
 -- >>> demoWindowHandles
 demoWindowHandles :: IO ()
 demoWindowHandles = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
 
-  logM "window Handle" $ getWindowHandle ses
+  logShowM "window Handle" $ getWindowHandle ses
 
   w <- newWindow ses
   log "new window Handle" $ txt w

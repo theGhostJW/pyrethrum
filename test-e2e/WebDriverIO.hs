@@ -117,7 +117,7 @@ import Network.HTTP.Req as R
     runReq,
     (/:),
   )
-import Shared (txt)
+import Utils (txt)
 import WebDriverPure (RequestArgs (..), parseJson, prettyPrintJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W

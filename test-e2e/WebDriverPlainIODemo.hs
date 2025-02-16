@@ -106,7 +106,7 @@ import WebDriverIO
 import WebDriverPure (seconds, second)
 import Prelude hiding (log)
 import Data.Text (Text)
-import Shared (txt)
+import Utils (txt)
 import Control.Monad (forM_)
 
 logTxt :: Text -> IO ()

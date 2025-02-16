@@ -11,9 +11,10 @@ import Data.Aeson
 
 import Data.Text (Text, pack)
 
-{- 16-02-2025
+{-
+16-02-2025
   this module is duplicated across all libs because HLS had issues win a shared directory
-  ie. was saying - Module ‘Utils’ does not export ‘opt’ when clearly it did
+  ie. was saying - Module Utils does not export opt when clearly it did
 
   shared liibrary not yet supported by HLS - when it is this module can go in a shared lib
   (ie. another cabal file entry)

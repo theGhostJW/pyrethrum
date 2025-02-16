@@ -1,11 +1,5 @@
 cabal-version: 3.6
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
---
--- see: https://github.com/sol/hpack
---
--- hash: 21f68538be52b22cf6f1cfeddd9a9b717885bd503b99db92a5818e065a5e637e
-
 name:           pyrethrum
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/simple-hpack#readme>

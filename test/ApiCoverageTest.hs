@@ -214,9 +214,9 @@ allSpecsSample =
       toSpecLine $ releaseActions session
     ]
 
--- >>> unit_testAllEndpointsCovered
-unit_testAllEndpointsCovered :: Assertion
-unit_testAllEndpointsCovered = do
+-- >>> unit_test_all_endpoints_covered
+unit_test_all_endpoints_covered :: Assertion
+unit_test_all_endpoints_covered = do
   -- print allSpecsSample
   -- putStrLn ""
   assertBool ("Missing specs:\n " <> show missing) (S.null missing)

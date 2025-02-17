@@ -45,8 +45,6 @@ module WebDriverIO
     newSession,
     minFirefoxSession,
     performActions,
-    -- just use text for debugging
-    performActions',
     releaseActions,
     deleteSession,
     navigateTo,
@@ -92,7 +90,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Result (..), Value, object)
-import Data.Either (fromRight)
+
 import Data.Foldable (foldl')
 import Data.Function ((&))
 import Data.Text (Text, unpack)
@@ -118,7 +116,7 @@ import Network.HTTP.Req as R
     (/:),
   )
 import Utils (txt)
-import WebDriverPure (RequestArgs (..), parseJson, prettyPrintJson)
+import WebDriverPure (RequestArgs (..), prettyPrintJson)
 import WebDriverSpec (DriverStatus, ElementId, HttpResponse (..), Selector, SessionId, W3Spec (..))
 import WebDriverSpec qualified as W
 import Prelude hiding (log)
@@ -159,7 +157,7 @@ getWindowHandle = run . W.getWindowHandle
 getWindowRect :: SessionId -> IO W.WindowRect
 getWindowRect = run . W.getWindowRect
 
-getWindowHandles :: SessionId -> IO [Text]
+getWindowHandles :: SessionId -> IO [W.WindowHandle]
 getWindowHandles = run . W.getWindowHandles
 
 newWindow :: SessionId -> IO W.WindowHandleSpec
@@ -308,9 +306,6 @@ sendAlertText s = run . W.sendAlertText s
 
 performActions :: SessionId -> W.Actions -> IO ()
 performActions s = run . W.performActions s
-
-performActions' :: SessionId -> Text -> IO ()
-performActions' s = run . W.performActions' s . fromRight (error "FAILED") . parseJson
 
 releaseActions :: SessionId -> IO ()
 releaseActions = run . W.releaseActions

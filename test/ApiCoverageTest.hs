@@ -92,18 +92,20 @@ GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screens
 POST 	/session/{session id}/print 	Print Page
 |]
 
-session_id :: Text
-session_id = "session_id"
+sessionId :: Text
+sessionId = "session_id"
 
 session :: SessionId
-session = Session session_id
+session = Session sessionId
 
-element_id :: Text
-element_id = "element_id"
+elementId :: Text
+elementId = "element_id"
 
 element :: ElementId
-element = Element element_id
+element = Element elementId
 
+windowHandle :: WindowHandle
+windowHandle = Handle "window-handle"
 
 selector :: Selector
 selector = CSS "Blahh"
@@ -123,75 +125,72 @@ toSpecLine w3 = case w3 of
   where 
     command = w3.description
     path = 
-      replace "{element id}" element_id
-      . replace "{session id}" session_id 
+      replace "{element id}" elementId
+      . replace "{session id}" sessionId 
       $ "/" <> intercalate "/" w3.path
 
 allSpecsSample :: [SpecLine]
 allSpecsSample = [
-  toSpecLine $ newSession minFirefoxCapabilities,
-  toSpecLine status,
-  toSpecLine $ maximizeWindow session,
-  toSpecLine $ minimizeWindow session,
-  toSpecLine $ fullscreenWindow session,
-  toSpecLine $ getTimeouts session,
-  toSpecLine $ setTimeouts session $ MkTimeouts Nothing Nothing Nothing,
-  toSpecLine $ switchToFrame session TopLevelFrame,
-  toSpecLine $ getCurrentUrl session,
-  toSpecLine $ findElementFromElement session element selector,
-  toSpecLine $ findElementsFromElement session element selector,
-  toSpecLine $ findElements session selector,
-  toSpecLine $ getTitle session,
-  toSpecLine $ getWindowHandle session,
-  toSpecLine $ isElementSelected session element,
-  toSpecLine $ closeWindow session,
-  toSpecLine $ back session,
-  toSpecLine $ forward session,
-  toSpecLine $ refresh session,
-  toSpecLine $ newSession minFirefoxCapabilities,
-  toSpecLine $ deleteSession session,
-  toSpecLine $ getActiveElement session,
-  toSpecLine $ getWindowHandles session,
-  toSpecLine $ newWindow session --,
-  -- toSpecLine $ switchToWindow session,
-  -- toSpecLine $ navigateTo,
-  -- toSpecLine $ findElement,
-  -- toSpecLine $ getWindowRect,
-  -- toSpecLine $ elementClick,
-  -- toSpecLine $ getElementText,
-  -- toSpecLine $ switchToParentFrame,
-  -- toSpecLine $ getElementProperty,
-  -- toSpecLine $ getElementAttribute,
-  -- toSpecLine $ getElementCssValue,
-  -- toSpecLine $ setWindowRect,
-  -- toSpecLine $ findElementsFromShadowRoot,
-  -- toSpecLine $ getElementShadowRoot,
-  -- toSpecLine $ findElementFromShadowRoot,
-  -- toSpecLine $ getElementTagName,
-  -- toSpecLine $ getElementRect,
-  -- toSpecLine $ isElementEnabled,
-  -- toSpecLine $ getElementComputedRole,
-  -- toSpecLine $ getElementComputedLabel,
-  -- toSpecLine $ elementClear,
-  -- toSpecLine $ elementSendKeys,
-  -- toSpecLine $ getPageSource,
-  -- toSpecLine $ takeScreenshot,
-  -- toSpecLine $ takeElementScreenshot,
-  -- toSpecLine $ performActions',
-  -- toSpecLine $ printPage,
-  -- toSpecLine $ executeScript,
-  -- toSpecLine $ executeScriptAsync,
-  -- toSpecLine $ getAllCookies,
-  -- toSpecLine $ getNamedCookie,
-  -- toSpecLine $ addCookie,
-  -- toSpecLine $ deleteCookie,
-  -- toSpecLine $ deleteAllCookies,
-  -- toSpecLine $ dismissAlert,
-  -- toSpecLine $ acceptAlert,
-  -- toSpecLine $ getAlertText,
-  -- toSpecLine $ sendAlertText,
-  -- toSpecLine $ performActions,
-  -- toSpecLine $ releaseActions
+    toSpecLine $ newSession minFirefoxCapabilities
+  , toSpecLine status
+  , toSpecLine $ maximizeWindow session
+  , toSpecLine $ minimizeWindow session
+  , toSpecLine $ fullscreenWindow session
+  , toSpecLine $ getTimeouts session
+  , toSpecLine $ setTimeouts session $ MkTimeouts Nothing Nothing Nothing
+  , toSpecLine $ switchToFrame session TopLevelFrame
+  , toSpecLine $ getCurrentUrl session
+  , toSpecLine $ findElementFromElement session element selector
+  , toSpecLine $ findElementsFromElement session element selector
+  , toSpecLine $ findElements session selector
+  , toSpecLine $ getTitle session
+  , toSpecLine $ getWindowHandle session
+  , toSpecLine $ isElementSelected session element
+  , toSpecLine $ closeWindow session
+  , toSpecLine $ back session
+  , toSpecLine $ forward session
+  , toSpecLine $ refresh session
+  , toSpecLine $ newSession minFirefoxCapabilities
+  , toSpecLine $ deleteSession session
+  , toSpecLine $ getActiveElement session
+  , toSpecLine $ getWindowHandles session
+  , toSpecLine $ newWindow session
+  , toSpecLine $ switchToWindow session windowHandle
+  , toSpecLine $ navigateTo session "url"
+  , toSpecLine $ findElement session selector
+  , toSpecLine $ getWindowRect session
+  , toSpecLine $ elementClick session element
+  , toSpecLine $ getElementText session element
+  , toSpecLine $ switchToParentFrame session
+  , toSpecLine $ getElementProperty session element "someProperty"
+  , toSpecLine $ getElementAttribute session element "someAttribute"
+  , toSpecLine $ getElementCssValue session element "background-color"
+  , toSpecLine $ setWindowRect session (Rect 0 0 1280 720)
+  , toSpecLine $ findElementsFromShadowRoot session element selector
+  , toSpecLine $ getElementShadowRoot session element
+  , toSpecLine $ findElementFromShadowRoot session element {-  -} selector
+  , toSpecLine $ getElementTagName session element
+  , toSpecLine $ getElementRect session element
+  , toSpecLine $ isElementEnabled session element
+  , toSpecLine $ getElementComputedRole session element
+  , toSpecLine $ getElementComputedLabel session element
+  , toSpecLine $ elementClear session element
+  , toSpecLine $ elementSendKeys session element "Some keys"
+  , toSpecLine $ getPageSource session
+  , toSpecLine $ takeScreenshot session
+  , toSpecLine $ takeElementScreenshot session element
+  , toSpecLine $ printPage session
+  , toSpecLine $ executeScript session "console.log('test');" []
+  , toSpecLine $ executeScriptAsync session "console.log('test');" []
+  , toSpecLine $ getAllCookies session
+  , toSpecLine $ getNamedCookie session "testCookie"
+  , toSpecLine $ addCookie session $ MkCookie "testCookie" "testValue" Nothing Nothing Nothing Nothing Nothing Nothing
+  , toSpecLine $ deleteCookie session "testCookie"
+  , toSpecLine $ deleteAllCookies session
+  , toSpecLine $ dismissAlert session
+  , toSpecLine $ acceptAlert session
+  , toSpecLine $ getAlertText session
+  , toSpecLine $ sendAlertText session "Test alert"
+  , toSpecLine $ performActions session $ MkActions []
+  , toSpecLine $ releaseActions session
  ]
-
-

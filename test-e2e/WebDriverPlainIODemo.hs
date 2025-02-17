@@ -205,11 +205,6 @@ demoForwardBackRefresh = do
 
   deleteSession ses
 
--- >>> testEval
-testEval :: IO ()
-testEval = Prelude.putStrLn "testEval"
-
-
 -- >>> demoWindowHandles
 demoWindowHandles :: IO ()
 demoWindowHandles = do
@@ -488,7 +483,7 @@ demoCookies = do
   logShowM "getNamedCookie: optimizelyEndUserId" $ getNamedCookie ses "optimizelyEndUserId"
 
   let myCookie =
-        Cookie
+        MkCookie
           { name = "myCookie",
             value = "myCookieValue",
             path = Just "/",

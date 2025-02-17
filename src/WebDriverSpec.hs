@@ -73,7 +73,6 @@ module WebDriverSpec
     getPageSource,
     takeScreenshot,
     takeElementScreenshot,
-    performActions',
     printPage,
     executeScript,
     executeScriptAsync,
@@ -246,7 +245,7 @@ frameJson fr =
         FrameNumber n -> Number $ fromIntegral n
         FrameElementId elm -> object [elementFieldName .= elm.id]
 
-data Cookie = Cookie
+data Cookie = MkCookie
   { name :: Text,
     value :: Text,
     -- optional
@@ -262,7 +261,7 @@ data Cookie = Cookie
 
 instance ToJSON Cookie where
   toJSON :: Cookie -> Value
-  toJSON Cookie {name, value, path, domain, secure, httpOnly, sameSite, expiry} =
+  toJSON MkCookie {name, value, path, domain, secure, httpOnly, sameSite, expiry} =
     object $
       [ "name" .= name,
         "value" .= value
@@ -428,7 +427,7 @@ switchToWindow :: SessionId -> WindowHandle -> W3Spec ()
 switchToWindow sessionRef Handle {handle} = Post "Switch To Window" (sessionUri1 sessionRef "window") (object ["handle" .= handle]) voidParser
 
 -- GET 	/session/{session id}/window/handles 	Get Window Handles
-getWindowHandles :: SessionId -> W3Spec [Text]
+getWindowHandles :: SessionId -> W3Spec [WindowHandle]
 getWindowHandles sessionRef = Get "Get Window Handles" (sessionUri2 sessionRef "window" "handles") windowHandlesParser
 
 -- POST 	/session/{session id}/frame 	Switch To Frame
@@ -579,10 +578,6 @@ deleteAllCookies sessionId = Delete "Delete All Cookies" (sessionUri1 sessionId 
 performActions :: SessionId -> Actions -> W3Spec ()
 performActions sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") (actionsToJson actions) voidParser
 
--- POST 	/session/{session id}/actions 	Perform Actions
-performActions' :: SessionId -> Value -> W3Spec ()
-performActions' sessionId actions = Post "Perform Actions" (sessionUri1 sessionId "actions") actions voidParser
-
 -- DELETE 	/session/{session id}/actions 	Release Actions
 releaseActions :: SessionId -> W3Spec ()
 releaseActions sessionId = Delete "Release Actions" (sessionUri1 sessionId "actions") voidParser
@@ -662,11 +657,11 @@ windowHandleParser r =
   bodyValue r
     >>= fromJSON
 
-windowHandlesParser :: HttpResponse -> Result [Text]
+windowHandlesParser :: HttpResponse -> Result [WindowHandle]
 windowHandlesParser r = do
   bodyValue r
     >>= \case
-      Array a -> sequence . toList $ asText <$> a
+      Array a -> (Handle <$>) <$> (sequence . toList $ asText <$> a)
       v -> aesonTypeError "Array" v
 
 -- windowHandleFromValue :: Value -> Maybe WindowHandleSpec
@@ -696,7 +691,7 @@ cookieFromBody b = case b of
     httpOnly <- optBool "httpOnly" 
     sameSite <- optBase toSameSite "sameSite" 
     expiry <- optInt "expiry" 
-    pure $ Cookie {..}
+    pure $ MkCookie {..}
     where 
       optBase :: (Value -> Result a) -> Key -> Result (Maybe a)
       optBase typeCaster k = AKM.lookup k kv & maybe (Success Nothing) (fmap Just . typeCaster)

@@ -1,8 +1,9 @@
-module WebDriverPlainIODemo where
+module WebDriverDemoStubsTest where
 
 import Data.Aeson (Value (..))
 import Data.Set qualified as Set
 import Data.Text.IO qualified as TIO
+import Test.Tasty.HUnit as HUnit ( Assertion, HasCallStack, (@=?), assertBool )
 import WebDriverDemoUtils
   ( alertsUrl,
     anyElmCss,
@@ -108,6 +109,7 @@ import Prelude hiding (log)
 import Data.Text (Text)
 import Utils (txt)
 import Control.Monad (forM_)
+import WebDriverSpec (DriverStatus(..))
 
 logTxt :: Text -> IO ()
 logTxt = TIO.putStrLn
@@ -141,17 +143,28 @@ mkExtendedTimeoutsSession = do
       }
   pure ses
 
--- >>> demoSessionDriverStatus
-demoSessionDriverStatus :: IO ()
-demoSessionDriverStatus = do
+-- todo: test extras - split off
+
+(===) :: (Eq a, Show a, HasCallStack)
+  => a -- ^ The actual value
+  -> a -- ^ The expected value
+  -> Assertion
+(===) = (@=?)
+
+
+-- >>> unit_demoSessionDriverStatus
+unit_demoSessionDriverStatus :: IO ()
+unit_demoSessionDriverStatus = do
   ses <- minFirefoxSession
   log "new session" $ txt ses
+  s <- status
+  Ready === s
   logShowM "driver status" status
   deleteSession ses
 
--- >>> demoSendKeysClear
-demoSendKeysClear :: IO ()
-demoSendKeysClear = do
+-- >>> unit_demoSendKeysClear
+unit_demoSendKeysClear :: IO ()
+unit_demoSendKeysClear = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses loginUrl
   usr <- findElement ses userNameCss
@@ -165,9 +178,9 @@ demoSendKeysClear = do
   sleep2
   deleteSession ses
 
--- >>> demoForwardBackRefresh
-demoForwardBackRefresh :: IO ()
-demoForwardBackRefresh = do
+-- >>> unit_demoForwardBackRefresh
+unit_demoForwardBackRefresh :: IO ()
+unit_demoForwardBackRefresh = do
   ses <- mkExtendedTimeoutsSession
 
   navigateTo ses theInternet
@@ -205,9 +218,9 @@ demoForwardBackRefresh = do
 
   deleteSession ses
 
--- >>> demoWindowHandles
-demoWindowHandles :: IO ()
-demoWindowHandles = do
+-- >>> unit_demoWindowHandles
+unit_demoWindowHandles :: IO ()
+unit_demoWindowHandles = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
 
@@ -227,9 +240,9 @@ demoWindowHandles = do
   logShowM "all windows handles" $ getWindowHandles ses
   deleteSession ses
 
--- >>> demoWindowSizes
-demoWindowSizes :: IO ()
-demoWindowSizes = do
+-- >>> unit_demoWindowSizes
+unit_demoWindowSizes :: IO ()
+unit_demoWindowSizes = do
   ses <- mkExtendedTimeoutsSession
   ---
   maximizeWindow ses
@@ -247,9 +260,9 @@ demoWindowSizes = do
 
   deleteSession ses
 
--- >>> demoElementPageProps
-demoElementPageProps :: IO ()
-demoElementPageProps = do
+-- >>> unit_demoElementPageProps
+unit_demoElementPageProps :: IO ()
+unit_demoElementPageProps = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
   logM "current url" $ getCurrentUrl ses
@@ -280,31 +293,38 @@ demoElementPageProps = do
 
   deleteSession ses
 
--- >>> demoTimeouts
-demoTimeouts :: IO ()
-demoTimeouts = do
+-- >>> unit_demoTimeouts
+unit_demoTimeouts :: IO ()
+unit_demoTimeouts = do
   ses <- minFirefoxSession
   log "new session" $ txt ses
   ---
   logShowM "timeouts" $ getTimeouts ses
-  setTimeouts ses $
-    MkTimeouts
-      { pageLoad = Just $ 50 * seconds,
+  let timeouts = MkTimeouts {
+        pageLoad = Just $ 50 * seconds,
         script = Just $ 11 * seconds,
         implicit = Just $ 12 * seconds
       }
-  logShowM "updated timeouts" $ getTimeouts ses
+  setTimeouts ses timeouts
+  timeouts' <- getTimeouts ses
+
+  logShow "updated timeouts" timeouts'
+  timeouts === timeouts'
+
   deleteSession ses
 
--- >>> demoWindowRecs
-demoWindowRecs :: IO ()
-demoWindowRecs = do
+-- >>> unit_demoWindowRecs
+unit_demoWindowRecs :: IO ()
+unit_demoWindowRecs = do
   ses <- mkExtendedTimeoutsSession
   ---
-  logShowM "window rect" $ getWindowRect ses
+  let wr =  Rect 500 300 500 500
+  logShowM "set window rect" $ setWindowRect ses wr
+  r <- getWindowRect ses
   sleepMs $ 2 * seconds
-  logShowM "set window rect" $ setWindowRect ses $ Rect 500 300 500 500
-  sleepMs $ 2 * seconds
+  logShow "window rect" r
+
+  wr === r
 
   navigateTo ses inputsUrl
   div' <- findElement ses contentCss
@@ -316,43 +336,58 @@ demoWindowRecs = do
 
   deleteSession ses
 
--- >>> demoWindowFindElement
-demoWindowFindElement :: IO ()
-demoWindowFindElement = do
+chkHasElms :: Foldable t => t a -> Assertion
+chkHasElms els = assertBool "elements should be found" $ not (null els)
+
+-- >>> unit_demoWindowFindElement
+unit_demoWindowFindElement :: IO ()
+unit_demoWindowFindElement = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses inputsUrl
   allElms <- findElements ses anyElmCss
+
+  chkHasElms allElms
+
   logShow "all elements" allElms
   div' <- findElement ses contentCss
   input <- findElementFromElement ses div' inputTagCss
   logShow "input tag" input
 
   els <- findElementsFromElement ses div' anyElmCss
+
+  chkHasElms els
   logShow "elements in div" els
 
   deleteSession ses
 
--- >>> demoFrames
-demoFrames :: IO ()
-demoFrames = do
+-- >>> unit_demoFrames
+unit_demoFrames :: IO ()
+unit_demoFrames = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses framesUrl
 
   logTxt "At top level frame"
-  logShowM "bottom frame exists" $ bottomFameExists ses
+  hasBottomFrame <- bottomFameExists ses
+
+  logShow "bottom frame exists" hasBottomFrame
+  assertBool "bottom frame should exist" hasBottomFrame
 
   -- switch frames using element id
   tf <- findElement ses topFrameCSS
   logShow "switch to top frame" tf
   switchToFrame ses (FrameElementId tf)
 
-  logShowM "bottom frame exists after switching to top frame" $ bottomFameExists ses
+  hasBottomFrame' <- bottomFameExists ses
+  logShow "bottom frame exists after switching to top frame" hasBottomFrame'
+  assertBool "bottom frame should not exist after switching to top frame" $ not hasBottomFrame'
 
   mf <- findElement ses midFrameCss
   switchToFrame ses (FrameElementId mf)
 
   fTitle <- findElement ses midFrameTitle
-  logM "middle frame title" $ getElementText ses fTitle
+  titleTxt <- getElementText ses fTitle
+  log "middle frame title" titleTxt
+  "MIDDLE" === titleTxt
 
   logTxt "switch to top level frame"
   switchToFrame ses TopLevelFrame
@@ -378,10 +413,13 @@ demoFrames = do
   switchToParentFrame ses
   logShowM "active element" $ getActiveElement ses
 
+  hasBottomFrame'' <- bottomFameExists ses
+  logShow "bottom frame exists" hasBottomFrame''
+  assertBool "bottom frame should exist" hasBottomFrame''
+
   logTxt "Switch to frame 1"
   switchToFrame ses $ FrameNumber 1
 
-  logShowM "bottom frame exists" $ bottomFameExists ses
   logShowM "active element" $ getActiveElement ses
 
   deleteSession ses
@@ -389,11 +427,9 @@ demoFrames = do
 bottomFameExists :: SessionId -> IO Bool
 bottomFameExists ses = not . null <$> findElements ses bottomFrameCss
 
--- >>> demoShadowDom
-demoShadowDom :: IO ()
-demoShadowDom = do
-  -- TODO: Session deletion causes gheckoDriver to thow an error
-  -- even though the steps all work - driver bug? investiggate log
+-- >>> unit_demoShadowDom
+unit_demoShadowDom :: IO ()
+unit_demoShadowDom = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses shadowDomUrl
 
@@ -407,37 +443,44 @@ demoShadowDom = do
 
   -- From the shadow root, find all elements
   -- allInsideShadow <- findElementsFromShadowRoot ses shadowRootId (CSS "*")
-  allInsideShadow <- findElementsFromShadowRoot ses myParagraphId anyElmCss
+  allInsideShadow <- findElementsFromShadowRoot ses shadowRootId anyElmCss
   logShow "shadow root elements" allInsideShadow
 
+  chkHasElms allInsideShadow
   logTxt "got root elements"
 
-  srootElm <- findElementFromShadowRoot ses myParagraphId anyElmCss
+  srootElm <- findElementFromShadowRoot ses shadowRootId anyElmCss
   logShow "shadow root element" srootElm
 
   -- Retrieve text from the shadow element:
   logShowM "shadow text" $ getElementText ses srootElm
   deleteSession ses
 
--- >>> demoIsElementSelected
-demoIsElementSelected :: IO ()
-demoIsElementSelected = do
+-- >>> unit_demoIsElementSelected
+unit_demoIsElementSelected :: IO ()
+unit_demoIsElementSelected = do
   ses <- mkExtendedTimeoutsSession
   logShowM "driver status" status
   navigateTo ses checkBoxesUrl
   allCbs <- findElements ses checkBoxesCss
   forM_ allCbs $ \cb -> do
-    logShowM "checkBox isElementSelected" $ isElementSelected ses cb
+    before <- isElementSelected ses cb
+    logShow "checkBox isElementSelected before" before
+
     elementClick ses cb
     logTxt "clicked"
-    logShowM "checkBox isElementSelected" $ isElementSelected ses cb
+
+    after <- isElementSelected ses cb
+    logShow "checkBox isElementSelected after click" after
+
+    assertBool "checkBox state should change after click" $ not before == after
     logTxt "------------------"
 
   deleteSession ses
 
--- >>> demoGetPageSourceScreenShot
-demoGetPageSourceScreenShot :: IO ()
-demoGetPageSourceScreenShot = do
+-- >>> unit_demoGetPageSourceScreenShot
+unit_demoGetPageSourceScreenShot :: IO ()
+unit_demoGetPageSourceScreenShot = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
   logTxt "!!!!! Page Source !!!!!"
@@ -451,18 +494,18 @@ demoGetPageSourceScreenShot = do
   logShowM "take element screenshot" $ takeElementScreenshot ses chkBoxLink
   deleteSession ses
 
--- >>> demoPrintPage
-demoPrintPage :: IO ()
-demoPrintPage = do
+-- >>> unit_demoPrintPage
+unit_demoPrintPage :: IO ()
+unit_demoPrintPage = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
   -- pdf (encoded string)
   logM "print page" $ printPage ses
   deleteSession ses
 
---- >>> demoExecuteScript
-demoExecuteScript :: IO ()
-demoExecuteScript = do
+--- >>> unit_demoExecuteScript
+unit_demoExecuteScript :: IO ()
+unit_demoExecuteScript = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
   logShowM "executeScript" $ executeScript ses "return arguments[0];" [String "Hello from Pyrethrum!", Number 2000]
@@ -473,9 +516,9 @@ demoExecuteScript = do
   sleep2
   deleteSession ses
 
--- >>> demoCookies
-demoCookies :: IO ()
-demoCookies = do
+-- >>> unit_demoCookies
+unit_demoCookies :: IO ()
+unit_demoCookies = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
   logShowM "cookies" $ getAllCookies ses
@@ -487,7 +530,7 @@ demoCookies = do
           { name = "myCookie",
             value = "myCookieValue",
             path = Just "/",
-            domain = Just "the-internet.herokuapp.com",
+            domain = Just ".the-internet.herokuapp.com",
             secure = Just True,
             sameSite = Just Strict,
             httpOnly = Just False,
@@ -498,16 +541,26 @@ demoCookies = do
   logShowM "addCookie" $ addCookie ses myCookie
   logShowM "cookies after add" $ getAllCookies ses
 
+  myCookie' <- getNamedCookie ses "myCookie"
+  myCookie === myCookie'
+
   logShowM "deleteCookie (myCookie)" $ deleteCookie ses "myCookie"
-  logShowM "cookies after delete" $ getAllCookies ses
+  afterRemove <- getAllCookies ses
+  logShow "cookies after delete" afterRemove
+
+  assertBool "cookie should be removed" $ not (any ((== "myCookie") . (.name)) afterRemove)
+  assertBool "there still should be cookies in the list" $ not (null afterRemove)
 
   logShowM "deleteAllCookies" $ deleteAllCookies ses
-  logShowM "cookies after delete all" $ getAllCookies ses
+  afterDeleteAll <- getAllCookies ses
+  logShow "cookies after delete all" afterDeleteAll
+  assertBool "all cookies should be removed" $ null afterDeleteAll
+  
   deleteSession ses
 
--- >>> demoAlerts
-demoAlerts :: IO ()
-demoAlerts = do
+-- >>> unit_demoAlerts
+unit_demoAlerts :: IO ()
+unit_demoAlerts = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses alertsUrl
 
@@ -515,7 +568,9 @@ demoAlerts = do
   elementClick ses alert
 
   sleep2
-  logShowM "get alert text" $ getAlertText ses
+  at <- getAlertText ses
+  logShow "get alert text" at
+  "I am a JS Alert" === at
 
   sleep2
   logShowM "acceptAlert" $ acceptAlert ses
@@ -533,9 +588,9 @@ demoAlerts = do
   sleep1
   deleteSession ses
 
--- >>> demoPointerNoneActions
-demoPointerNoneActions :: IO ()
-demoPointerNoneActions = do
+-- >>> unit_demoPointerNoneActions
+unit_demoPointerNoneActions :: IO ()
+unit_demoPointerNoneActions = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses theInternet
 
@@ -600,25 +655,76 @@ demoPointerNoneActions = do
                 noneActions = [
                   Nothing,
                   Just $ 1 * second,
-                  Just $ 10 * seconds
+                  Just $ 4 * seconds,
+                  Nothing,
+                  Nothing
                 ]}
               --
           ]
 
   logTxt "move and None actions"
   performActions ses pointer
+  deleteSession ses
 
--- >>> demoWheelActions
-demoWheelActions :: IO ()
-demoWheelActions = do
+-- >>> unit_demoKeyAndReleaseActions
+unit_demoKeyAndReleaseActions :: IO ()
+unit_demoKeyAndReleaseActions = do
+  ses <- mkExtendedTimeoutsSession
+  navigateTo ses loginUrl
+  usr <- findElement ses userNameCss
+  elementClick ses usr
+
+  let keys =
+        MkActions
+          [ Key
+              { id = "keyboard1",
+                keyActions =
+                  [
+                    PauseKey Nothing,
+                    KeyDown "a",
+                    -- a random pause to test the API
+                    PauseKey . Just $ 2 * seconds,
+                    KeyUp "a",
+                    -- select the a
+                    -- send special control key not a raw control character
+                    -- Use \xE009 to represent the Unicode code point U+E009
+                    KeyDown "\xE009",
+                    KeyDown "a",
+                    -- this will do nothing - just used for correlating frames
+                    -- just testing tha API
+                    PauseKey Nothing
+                  ]
+              }
+          ]
+
+  sleep2
+  logTxt "key actions"
+  performActions ses keys
+
+  sleep2
+  releaseActions ses
+  sleep2
+  deleteSession ses
+
+-- >>> manyWheelActions
+manyWheelActions :: IO ()
+manyWheelActions = do
+  unit_demoKeyAndReleaseActions 
+  unit_demoWheelActions
+  -- unit_demoWheelActions
+  -- unit_demoWheelActions
+
+-- >>> unit_demoWheelActions
+unit_demoWheelActions :: IO ()
+unit_demoWheelActions = do
   ses <- mkExtendedTimeoutsSession
   navigateTo ses infinitScrollUrl
 
-  let wheel = 
+  let wheel =
         MkActions
-          [ Wheel 
+          [ Wheel
               { id = "wheel1",
-                wheelActions = 
+                wheelActions =
                   [ Scroll
                       { origin = Viewport,
                         x = 10,
@@ -644,45 +750,5 @@ demoWheelActions = do
   logTxt "wheel actions"
   performActions ses wheel
 
-  sleep2
-  deleteSession ses
-
--- >>> demoKeyAndReleaseActions
-demoKeyAndReleaseActions :: IO ()
-demoKeyAndReleaseActions = do
-  ses <- mkExtendedTimeoutsSession
-  navigateTo ses loginUrl
-  usr <- findElement ses userNameCss
-  elementClick ses usr
-
-  let keys =
-        MkActions
-          [ Key
-              { id = "keyboard1",
-                keyActions =
-                  [ 
-                    PauseKey Nothing,
-                    KeyDown "a",
-                    -- a random pause to test the API
-                    PauseKey . Just $ 2 * seconds,
-                    KeyUp "a",
-                    -- select the a
-                    -- send special control key not a raw control character
-                    -- Use \xE009 to represent the Unicode code point U+E009
-                    KeyDown "\xE009",
-                    KeyDown "a",
-                    -- this will do nothing - just used for correlating frames
-                    -- just testing tha API
-                    PauseKey Nothing
-                  ]
-              }
-          ]
-  
-  sleep2
-  logTxt "key actions"
-  performActions ses keys
-
-  sleep2
-  releaseActions ses
   sleep2
   deleteSession ses

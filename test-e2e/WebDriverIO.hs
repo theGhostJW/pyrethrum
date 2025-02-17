@@ -316,7 +316,8 @@ sleepMs :: Int -> IO ()
 sleepMs = threadDelay . (* 1_000)
 
 debug :: Bool
-debug = True
+debug = False
+
 
 -- no console out for "production"
 run :: (Show a) => W3Spec a -> IO a
@@ -331,7 +332,6 @@ run spec = do
       Delete {} -> pure ()
   callWebDriver debug (mkRequest spec) >>= parseIO spec
 
--- TODO: will neeed to be parameterised later
 mkRequest :: forall a. W3Spec a -> RequestArgs
 mkRequest = \case
   Get {path} -> RequestParams path GET NoReqBody 4444
@@ -369,37 +369,3 @@ callWebDriver wantLog RequestParams {subDirs, method, body, port = prt} =
     log m = liftIO $ when wantLog $ devLog m
     url :: Url 'Http
     url = foldl' (/:) (http "127.0.0.1") subDirs
-
---------------------------------------------------------------------------------
--- console out (to haskell output window) for debugging
--- run :: forall a. (Show a) =>  W3Spec a -> IO a
--- run spec =
---   describe spec.description $ do
---     devLog . txt $ mkShowable spec
---     r <- callWebDriver True $ mkRequest spec
---     parseIO spec r
-
--- describe :: (Show a) => Text -> IO a -> IO a
--- describe msg action = do
---   T.putStrLn ""
---   T.putStrLn $ "########### " <> msg <> " ###########"
---   ethr <- handleEx action
---   logResponse ethr
---   either (fail . toS . txt) pure ethr
-
--- handleEx :: IO a -> IO (Either HttpException a)
--- handleEx = try
-
--- logResponse :: (Show a) => Either HttpException a -> IO ()
--- logResponse =
---   either
---     ( \e -> do
---         T.putStrLn "!!!!!!!!!! REQUEST FAILED !!!!!!!!!!!"
---         T.putStrLn $ txt e
---     )
---     ( \r -> do
---         T.putStrLn "!!!!!!!!!! REQUEST SUCCEEDED !!!!!!!!!!!"
---         T.putStrLn $ txt r
---     )
-
---------------------------------------------------------------------------------

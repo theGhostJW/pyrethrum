@@ -222,7 +222,7 @@ data SameSite
   = Lax
   | Strict
   | None
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 instance ToJSON SameSite where
   toJSON :: SameSite -> Value
@@ -257,7 +257,7 @@ data Cookie = MkCookie
     -- When the cookie expires, specified in seconds since Unix Epoch.
     expiry :: Maybe Int
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance ToJSON Cookie where
   toJSON :: Cookie -> Value
@@ -383,8 +383,8 @@ getTimeouts sessionRef = Get "Get Timeouts" (sessionUri1 sessionRef "timeouts") 
 
 -- POST 	/session/{session id}/timeouts 	Set Timeouts
 setTimeouts :: SessionId -> Timeouts -> W3Spec ()
-setTimeouts sessionRef MkTimeouts {implicit, pageLoad, script} =
-  Post "Set Timeouts" (sessionUri1 sessionRef "timeouts") (object ["implicit" .= implicit, "pageLoad" .= pageLoad, "script" .= script]) voidParser
+setTimeouts sessionRef timeouts =
+  Post "Set Timeouts" (sessionUri1 sessionRef "timeouts") (toJSON timeouts) voidParser
 
 -- POST 	/session/{session id}/url 	Navigate To
 navigateTo :: SessionId -> Text -> W3Spec ()

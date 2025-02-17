@@ -33,6 +33,7 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Encoding qualified as E
 import Data.Text.IO qualified as T
 import Data.Text (Text)
+import Control.Exception (try, Exception (displayException), SomeException)
 
 {- Pure types and functions used in Webdriver -}
 
@@ -79,9 +80,12 @@ lsbToText = E.decodeUtf8 . LBS.toStrict
 jsonToText :: Value -> Text
 jsonToText = lsbToText . encodePretty
 
-prettyPrintJson :: Value -> IO ()
-prettyPrintJson = T.putStrLn . jsonToText
 
+prettyPrintJson :: Value -> IO ()
+prettyPrintJson v = do
+  e <- (try @SomeException @_)$ T.putStrLn (jsonToText v)
+  either (print . displayException) print e
+  
 parseJson :: Text -> Either String Value
 parseJson input =
   eitherDecodeStrict (E.encodeUtf8 input)

@@ -4,16 +4,36 @@ import WebDriverSpec (Selector (CSS, XPath))
 import Data.Text (Text)
 
 
--- ################### Effectful Demo ##################
+-- ################### urls ##################
 
 theInternet :: Text
 theInternet = "https://the-internet.herokuapp.com/"
 
+subDomain :: Text -> Text
+subDomain sd = theInternet <> sd
+
 alertsUrl :: Text
-alertsUrl = "https://the-internet.herokuapp.com/javascript_alerts"
+alertsUrl = subDomain "javascript_alerts"
 
 infinitScrollUrl :: Text
-infinitScrollUrl = "https://the-internet.herokuapp.com/infinite_scroll"
+infinitScrollUrl = subDomain "infinite_scroll"
+
+framesUrl :: Text
+framesUrl = subDomain "nested_frames"
+
+inputsUrl :: Text
+inputsUrl = subDomain "inputs"
+
+loginUrl :: Text
+loginUrl = subDomain "login"
+
+checkBoxesUrl :: Text
+checkBoxesUrl = subDomain "checkboxes"
+
+shadowDomUrl :: Text
+shadowDomUrl = subDomain "shadowdom"
+
+-- ################### selectors  ##################
 
 checkBoxesLinkCss :: Selector
 checkBoxesLinkCss = CSS "#content > ul:nth-child(4) > li:nth-child(6) > a:nth-child(1)"
@@ -44,21 +64,6 @@ midFrameTitle = CSS "#content"
 
 userNameCss :: Selector
 userNameCss = CSS "#username"
-
-framesUrl :: Text
-framesUrl = "https://the-internet.herokuapp.com/nested_frames"
-
-inputsUrl :: Text
-inputsUrl = "https://the-internet.herokuapp.com/inputs"
-
-loginUrl :: Text
-loginUrl = "https://the-internet.herokuapp.com/login"
-
-checkBoxesUrl :: Text
-checkBoxesUrl = "https://the-internet.herokuapp.com/checkboxes"
-
-shadowDomUrl :: Text
-shadowDomUrl = "https://the-internet.herokuapp.com/shadowdom"
 
 contentCss :: Selector
 contentCss = CSS "#content"

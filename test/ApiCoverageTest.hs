@@ -1,20 +1,83 @@
 module ApiCoverageTest where
 
 import Capabilities
+    ( Timeouts(MkTimeouts), minFirefoxCapabilities )
 import Data.Set as S (Set, difference, fromList, null)
 import Data.Text as T (Text, intercalate, lines, null, pack, replace, strip, unwords, words)
 import GHC.Utils.Misc (filterOut)
-import Test.Tasty.HUnit as HUnit
+import Test.Tasty.HUnit as HUnit ( assertBool, Assertion )
 import Text.RawString.QQ (r)
 import WebDriverSpec
-
--- todo: test extras - split off
-
--- (===) :: (Eq a, Show a, HasCallStack)
---   => a -- ^ The actual value
---   -> a -- ^ The expected value
---   -> Assertion
--- (===) = (@=?)
+    ( SessionId(Session),
+      ElementId(Element),
+      Selector(CSS),
+      WindowHandle(Handle),
+      WindowRect(Rect),
+      FrameReference(TopLevelFrame),
+      Cookie(MkCookie),
+      Actions(MkActions),
+      W3Spec(description, Get, Post, PostEmpty, Delete, path),
+      acceptAlert,
+      addCookie,
+      back,
+      closeWindow,
+      deleteAllCookies,
+      deleteCookie,
+      deleteSession,
+      dismissAlert,
+      elementClear,
+      elementClick,
+      elementSendKeys,
+      executeScript,
+      executeScriptAsync,
+      findElement,
+      findElementFromElement,
+      findElementFromShadowRoot,
+      findElements,
+      findElementsFromElement,
+      findElementsFromShadowRoot,
+      forward,
+      fullscreenWindow,
+      getActiveElement,
+      getAlertText,
+      getAllCookies,
+      getCurrentUrl,
+      getElementAttribute,
+      getElementComputedLabel,
+      getElementComputedRole,
+      getElementCssValue,
+      getElementProperty,
+      getElementRect,
+      getElementShadowRoot,
+      getElementTagName,
+      getElementText,
+      getNamedCookie,
+      getPageSource,
+      getTimeouts,
+      getTitle,
+      getWindowHandle,
+      getWindowHandles,
+      getWindowRect,
+      isElementEnabled,
+      isElementSelected,
+      maximizeWindow,
+      minimizeWindow,
+      navigateTo,
+      newSession,
+      newWindow,
+      performActions,
+      printPage,
+      refresh,
+      releaseActions,
+      sendAlertText,
+      setTimeouts,
+      setWindowRect,
+      status,
+      switchToFrame,
+      switchToParentFrame,
+      switchToWindow,
+      takeElementScreenshot,
+      takeScreenshot )
 
 {-
 !! Replace this the endepoints from the spec with every release

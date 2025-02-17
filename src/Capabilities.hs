@@ -10,11 +10,11 @@ module Capabilities
     VendorSpecific (..),
     minCapabilities,
     minFirefoxCapabilities,
-    minChromeCapabilities
+    minChromeCapabilities,
   )
 where
 
-import Data.Text (Text)
+import Control.Applicative (Alternative (..))
 import Data.Aeson.Key (fromText)
 import Data.Aeson.Types
   ( FromJSON (parseJSON),
@@ -30,26 +30,26 @@ import Data.Aeson.Types
     (.:),
     (.:?),
   )
-import GHC.Generics ( Generic )
-import Data.Maybe (catMaybes)
 import Data.Bool (bool)
-import Control.Applicative (Alternative(..))
+import Data.Maybe (catMaybes)
+import Data.Text (Text)
+import GHC.Generics (Generic)
 import Utils (opt)
 
-
 minCapabilities :: BrowserName -> Capabilities
-minCapabilities browserName = MkCapabilities
-  { browserName,
-    browserVersion = Nothing,
-    platformName = Nothing,
-    acceptInsecureCerts = Nothing,
-    pageLoadStrategy = Nothing,
-    proxy = Nothing,
-    timeouts = Nothing,
-    strictFileInteractability = Nothing,
-    unhandledPromptBehavior = Nothing,
-    vendorSpecific = Nothing
-  }
+minCapabilities browserName =
+  MkCapabilities
+    { browserName,
+      browserVersion = Nothing,
+      platformName = Nothing,
+      acceptInsecureCerts = Nothing,
+      pageLoadStrategy = Nothing,
+      proxy = Nothing,
+      timeouts = Nothing,
+      strictFileInteractability = Nothing,
+      unhandledPromptBehavior = Nothing,
+      vendorSpecific = Nothing
+    }
 
 minFirefoxCapabilities :: Capabilities
 minFirefoxCapabilities = minCapabilities Firefox
@@ -112,7 +112,6 @@ data Capabilities = MkCapabilities
   }
   deriving (Show, Generic)
 
-
 data SocksProxy = SocksProxy
   { socksProxy :: Text,
     socksVersion :: Int
@@ -136,18 +135,18 @@ instance FromJSON SocksProxy where
 
 data Proxy
   = Direct
-  | Manual {
-    ftpProxy :: Maybe Text,
-    httpProxy :: Maybe Text,
-    sslProxy :: Maybe Text,
-    socksProxy :: Maybe SocksProxy,
-    noProxy :: Maybe [Text]
-  }
+  | Manual
+      { ftpProxy :: Maybe Text,
+        httpProxy :: Maybe Text,
+        sslProxy :: Maybe Text,
+        socksProxy :: Maybe SocksProxy,
+        noProxy :: Maybe [Text]
+      }
   | AutoDetect
   | System
-  | Pac {
-    proxyAutoconfigUrl :: Text
-  }
+  | Pac
+      { proxyAutoconfigUrl :: Text
+      }
   deriving (Show, Eq)
 
 instance ToJSON Proxy where
@@ -158,35 +157,26 @@ instance ToJSON Proxy where
     System -> "system"
     Pac {..} -> object ["proxyAutoconfigUrl" .= proxyAutoconfigUrl]
     Manual {..} ->
-      object $ catMaybes
-        [ opt "ftpProxy" ftpProxy,
-          opt "httpProxy" httpProxy,
-          opt "sslProxy" sslProxy,
-          opt "socksProxy" socksProxy,
-          opt "noProxy" noProxy
-        ]
+      object $
+        catMaybes
+          [ opt "ftpProxy" ftpProxy,
+            opt "httpProxy" httpProxy,
+            opt "sslProxy" sslProxy,
+            opt "socksProxy" socksProxy,
+            opt "noProxy" noProxy
+          ]
 
--- TODO :: test esp manual 
+-- TODO :: test esp manual
 instance FromJSON Proxy where
   parseJSON :: Value -> Parser Proxy
-  parseJSON = withObject "Proxy" $ 
+  parseJSON = withObject "Proxy" $
     \v -> do
-      let 
-          direct = v .: "direct" >>= bool (fail "Invalid Proxy") (pure Direct) 
+      let direct = v .: "direct" >>= bool (fail "Invalid Proxy") (pure Direct)
           autoDetect = v .: "autodetect" >>= bool (fail "Invalid Proxy") (pure AutoDetect)
           system = v .: "system" >>= bool (fail "Invalid Proxy") (pure System)
           pac = Pac <$> v .: "proxyAutoconfigUrl"
           manual = Manual <$> v .:? "ftpProxy" <*> v .:? "httpProxy" <*> v .:? "sslProxy" <*> v .:? "socksProxy" <*> v .:? "noProxy"
       direct <|> autoDetect <|> system <|> pac <|> manual
-
-
--- Timeouts Configuration
-data Timeouts = MkTimeouts
-  { implicit :: Maybe Int,
-    pageLoad :: Maybe Int,
-    script :: Maybe Int
-  }
-  deriving (Show, Generic)
 
 -- Vendor-Specific Capabilities
 data VendorSpecific
@@ -255,18 +245,17 @@ instance ToJSON Capabilities where
       object $
         [ "browserName" .= browserName
         ]
-          <> catMaybes [
-            opt "browserVersion" browserVersion,
-            opt "platformName" platformName,
-            opt "acceptInsecureCerts" acceptInsecureCerts,
-            opt "pageLoadStrategy" pageLoadStrategy,
-            opt "proxy" proxy,
-            opt "timeouts" timeouts,
-            opt "strictFileInteractability" strictFileInteractability,
-            opt "unhandledPromptBehavior" unhandledPromptBehavior
-          ]
+          <> catMaybes
+            [ opt "browserVersion" browserVersion,
+              opt "platformName" platformName,
+              opt "acceptInsecureCerts" acceptInsecureCerts,
+              opt "pageLoadStrategy" pageLoadStrategy,
+              opt "proxy" proxy,
+              opt "timeouts" timeouts,
+              opt "strictFileInteractability" strictFileInteractability,
+              opt "unhandledPromptBehavior" unhandledPromptBehavior
+            ]
           <> vendorSpecificToJSON vendorSpecific
-
 
 vendorSpecificToJSON :: Maybe VendorSpecific -> [Pair]
 vendorSpecificToJSON = maybe [] vendorSpecificToJSON'
@@ -279,15 +268,6 @@ vendorSpecificToJSON = maybe [] vendorSpecificToJSON'
       ChromeOptions {} -> "goog:chromeOptions"
       FirefoxOptions {} -> "moz:firefoxOptions"
       SafariOptions {} -> "safari:options"
-
-instance ToJSON Timeouts where
-  toJSON :: Timeouts -> Value
-  toJSON MkTimeouts {..} =
-    object
-      [ "script" .= script,
-        "pageLoad" .= pageLoad,
-        "implicit" .= implicit
-      ]
 
 -- ToJSON Instances for Custom Types
 instance ToJSON UnhandledPromptBehavior where
@@ -328,9 +308,9 @@ instance FromJSON UnhandledPromptBehavior where
   parseJSON :: Value -> Parser UnhandledPromptBehavior
   parseJSON = withText "UnhandledPromptBehavior" $ \case
     "dismiss" -> pure Dismiss
-    "accept" ->  pure Accept
+    "accept" -> pure Accept
     "dismiss and notify" -> pure DismissAndNotify
-    "accept and notify" -> pure  AcceptAndNotify
+    "accept and notify" -> pure AcceptAndNotify
     "ignore" -> pure Ignore
     other -> fail $ "UnhandledPromptBehavior: " <> show other
 
@@ -387,10 +367,26 @@ parseVendorSpecific v =
     <|> v
     .:? "safari:options"
 
+data Timeouts = MkTimeouts
+  { implicit :: Maybe Int, -- field order needs to be the same as FromJSON below
+    pageLoad :: Maybe Int,
+    script :: Maybe Int
+  }
+  deriving (Show, Generic, Eq)
+ 
 instance FromJSON Timeouts where
   parseJSON :: Value -> Parser Timeouts
   parseJSON = withObject "Timeouts" $ \v ->
     MkTimeouts
-      <$> v .:? "script"
+      <$> v .:? "implicit"
       <*> v .:? "pageLoad"
-      <*> v .:? "implicit"
+      <*> v .:? "script"
+
+instance ToJSON Timeouts where
+  toJSON :: Timeouts -> Value
+  toJSON MkTimeouts {..} =
+    object
+      [ "implicit" .= implicit,
+        "pageLoad" .= pageLoad,
+        "script" .= script
+      ]

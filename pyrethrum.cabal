@@ -152,12 +152,11 @@ test-suite test-e2e
     , pyrethrum
     , raw-strings-qq
   other-modules:
-      WebDriverPlainIODemo
+      WebDriverDemoStubsTest
     , WebDriverPure
     , WebDriverDemoUtils
     , WebDriverIO
     , Utils
-    , E2ETest 
   build-tool-depends:
     tasty-discover:tasty-discover
 

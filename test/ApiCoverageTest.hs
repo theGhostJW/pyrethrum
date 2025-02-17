@@ -3,23 +3,19 @@ module ApiCoverageTest where
 import Test.Tasty.HUnit as HUnit
 import Text.RawString.QQ (r)
 import WebDriverSpec
-import Data.Text
+import Data.Text as T ( Text, replace, intercalate, lines, pack, strip, null, words, unwords)
+import Data.Set as S (Set, fromList, null, difference) 
 import Capabilities
+import GHC.Utils.Misc (filterOut)
 
 
 -- todo: test extras - split off
 
-(===) :: (Eq a, Show a, HasCallStack)
-  => a -- ^ The actual value
-  -> a -- ^ The expected value
-  -> Assertion
-(===) = (@=?)
-
-
--- >>> unit_temp_demo
--- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-0.1.0.0-inplace-test", srcLocModule = "ApiCoverageTest", srcLocFile = "/workspaces/pyrethrum/test/ApiCoverageTest.hs", srcLocStartLine = 16, srcLocStartCol = 20, srcLocEndLine = 16, srcLocEndCol = 23})) "expected: 1\n but got: 2"
-unit_temp_demo :: IO ()
-unit_temp_demo = 1 === 2
+-- (===) :: (Eq a, Show a, HasCallStack)
+--   => a -- ^ The actual value
+--   -> a -- ^ The expected value
+--   -> Assertion
+-- (===) = (@=?)
 
 
 {-
@@ -89,8 +85,21 @@ GET 	/session/{session id}/alert/text 	Get Alert Text
 POST 	/session/{session id}/alert/text 	Send Alert Text
 GET 	/session/{session id}/screenshot 	Take Screenshot
 GET 	/session/{session id}/element/{element id}/screenshot 	Take Element Screenshot
-POST 	/session/{session id}/print 	Print Page
+POST 	/session/{session id}/print   Print Page
 |]
+
+parseLine :: Text -> SpecLine
+parseLine line = MkSpecLine method uriTemplate command
+  where
+    line' =  filterOut T.null $ T.words $ replaceTemplateTxt line
+    method = case line' of 
+      [] -> "PARSER ERROR NO METHOD IN LINE" <> line
+      x:_ -> x
+    uriTemplate = line' !! 1
+    command = T.unwords $ drop 2 line'
+
+specLinesFromSpec :: Set SpecLine
+specLinesFromSpec = fromList $ parseLine <$> filter (not . T.null) (strip <$> T.lines (pack endPointsCopiedFromSpc))
 
 sessionId :: Text
 sessionId = "session_id"
@@ -116,22 +125,22 @@ data SpecLine = MkSpecLine {
   command :: Text
 } deriving (Show, Eq, Ord)
 
+replaceTemplateTxt :: Text -> Text
+replaceTemplateTxt = replace "{session id}" sessionId . replace "{element id}" elementId
+
 toSpecLine :: W3Spec a -> SpecLine
 toSpecLine w3 = case w3 of
   Get {} -> MkSpecLine "GET" path command
   Post {} -> MkSpecLine "POST" path command
   PostEmpty {} -> MkSpecLine "POST" path command
   Delete {} -> MkSpecLine "DELETE" path command
-  where 
+  where
     command = w3.description
-    path = 
-      replace "{element id}" elementId
-      . replace "{session id}" sessionId 
-      $ "/" <> intercalate "/" w3.path
+    path = replaceTemplateTxt $ "/" <> intercalate "/" w3.path
 
-allSpecsSample :: [SpecLine]
-allSpecsSample = [
-    toSpecLine $ newSession minFirefoxCapabilities
+allSpecsSample :: Set SpecLine
+allSpecsSample = fromList [
+  toSpecLine $ newSession minFirefoxCapabilities
   , toSpecLine status
   , toSpecLine $ maximizeWindow session
   , toSpecLine $ minimizeWindow session
@@ -194,3 +203,12 @@ allSpecsSample = [
   , toSpecLine $ performActions session $ MkActions []
   , toSpecLine $ releaseActions session
  ]
+
+-- >>> unit_testAllEndpointsCovered
+-- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-0.1.0.0-inplace-test", srcLocModule = "ApiCoverageTest", srcLocFile = "/workspaces/pyrethrum/test/ApiCoverageTest.hs", srcLocStartLine = 212, srcLocStartCol = 3, srcLocEndLine = 212, srcLocEndCol = 19})) "Missing specs: fromList [MkSpecLine {method = \"DELETE\", uriTemplate = \"/session/session_id/cookie/{name}\", command = \"Delete Cookie\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/cookie/{name}\", command = \"Get Named Cookie\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/attribute/{name}\", command = \"Get Element Attribute\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/css/{property\", command = \"name} Get Element CSS Value\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/property/{name}\", command = \"Get Element Property\"},MkSpecLine {method = \"GET\", uriTemplate = \"/status\", command = \"Status\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/clear\", command = \"Element Clear\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/click\", command = \"Element Click\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/value\", command = \"Element Send Keys\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/shadow/{shadow\", command = \"id}/element Find Element From Shadow Root\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/shadow/{shadow\", command = \"id}/elements Find Elements From Shadow Root\"}]"
+unit_testAllEndpointsCovered :: Assertion
+unit_testAllEndpointsCovered = do
+  let missing = specLinesFromSpec `difference` allSpecsSample
+      extra   = allSpecsSample `difference` specLinesFromSpec
+  HUnit.assertBool ("Missing specs: " ++ show missing) (S.null missing)
+  HUnit.assertBool ("Extra specs: " ++ show extra) (S.null extra)

@@ -367,7 +367,7 @@ newSession capabilities = newSession' $ capsToJson capabilities
 
 -- POST 	/session 	New Session
 newSession' :: Value -> W3Spec SessionId
-newSession' capabilities = Post "Create New Session" [session] capabilities parseSessionRef
+newSession' capabilities = Post "New Session" [session] capabilities parseSessionRef
 
 -- DELETE 	/session/{session id} 	Delete Session
 deleteSession :: SessionId -> W3Spec ()
@@ -375,7 +375,7 @@ deleteSession sessionRef = Delete "Delete Session" (sessionUri sessionRef.id) vo
 
 -- GET 	/status 	Status
 status :: W3Spec DriverStatus
-status = Get "Get Driver Status" ["status"] parseDriverStatus
+status = Get "Status" ["status"] parseDriverStatus
 
 -- GET 	/session/{session id}/timeouts 	Get Timeouts
 getTimeouts :: SessionId -> W3Spec Timeouts
@@ -484,11 +484,11 @@ findElementsFromElement sessionId elementId selector = Post "Find Elements From 
 
 -- POST 	/session/{session id}/shadow/{shadow id}/element 	Find Element From Shadow Root
 findElementFromShadowRoot :: SessionId -> ElementId -> Selector -> W3Spec ElementId
-findElementFromShadowRoot sessionId shadowId selector = Post "Find Element From Shadow Root" (elementUri1 sessionId shadowId "element") (selectorJson selector) parseElementRef
+findElementFromShadowRoot sessionId shadowId selector = Post "Find Element From Shadow Root" (sessionUri3 sessionId "shadow" shadowId.id "element") (selectorJson selector) parseElementRef
 
 -- POST 	/session/{session id}/shadow/{shadow id}/elements 	Find Elements From Shadow Root
 findElementsFromShadowRoot :: SessionId -> ElementId -> Selector -> W3Spec [ElementId]
-findElementsFromShadowRoot sessionId shadowId selector = Post "Find Elements From Shadow Root" (elementUri1 sessionId shadowId "elements") (selectorJson selector) parseElementsRef
+findElementsFromShadowRoot sessionId shadowId selector = Post "Find Elements From Shadow Root" (sessionUri3 sessionId "shadow" shadowId.id "elements") (selectorJson selector) parseElementsRef
 
 -- GET 	/session/{session id}/element/{element id}/selected 	Is Element Selected
 isElementSelected :: SessionId -> ElementId -> W3Spec Bool
@@ -532,15 +532,15 @@ getElementComputedLabel sessionId elementId = Get "Get Computed Label" (elementU
 
 -- POST 	/session/{session id}/element/{element id}/click 	Element Click
 elementClick :: SessionId -> ElementId -> W3Spec ()
-elementClick sessionId elementId = PostEmpty "Click Element" (elementUri1 sessionId elementId "click") voidParser
+elementClick sessionId elementId = PostEmpty "Element Click" (elementUri1 sessionId elementId "click") voidParser
 
 -- POST 	/session/{session id}/element/{element id}/clear 	Element Clear
 elementClear :: SessionId -> ElementId -> W3Spec ()
-elementClear sessionId elementId = PostEmpty "Clear Element" (elementUri1 sessionId elementId "clear") voidParser
+elementClear sessionId elementId = PostEmpty "Element Clear" (elementUri1 sessionId elementId "clear") voidParser
 
 -- POST 	/session/{session id}/element/{element id}/value 	Element Send Keys
 elementSendKeys :: SessionId -> ElementId -> Text -> W3Spec ()
-elementSendKeys sessionId elementId keysToSend = Post "Send Keys to Element" (elementUri1 sessionId elementId "value") (keysJson keysToSend) voidParser
+elementSendKeys sessionId elementId keysToSend = Post "Element Send Keys" (elementUri1 sessionId elementId "value") (keysJson keysToSend) voidParser
 
 -- GET 	/session/{session id}/source 	Get Page Source
 getPageSource :: SessionId -> W3Spec Text
@@ -832,6 +832,9 @@ sessionUri1 sr sp = [session, sr.id, sp]
 
 sessionUri2 :: SessionId -> Text -> Text -> [Text]
 sessionUri2 sr sp sp2 = [session, sr.id, sp, sp2]
+
+sessionUri3 :: SessionId -> Text -> Text -> Text -> [Text]
+sessionUri3 sr sp sp2 sp3 = [session, sr.id, sp, sp2, sp3]
 
 window :: Text
 window = "window"

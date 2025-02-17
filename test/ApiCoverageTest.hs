@@ -1,13 +1,12 @@
 module ApiCoverageTest where
 
+import Capabilities
+import Data.Set as S (Set, difference, fromList, null)
+import Data.Text as T (Text, intercalate, lines, null, pack, replace, strip, unwords, words)
+import GHC.Utils.Misc (filterOut)
 import Test.Tasty.HUnit as HUnit
 import Text.RawString.QQ (r)
 import WebDriverSpec
-import Data.Text as T ( Text, replace, intercalate, lines, pack, strip, null, words, unwords)
-import Data.Set as S (Set, fromList, null, difference) 
-import Capabilities
-import GHC.Utils.Misc (filterOut)
-
 
 -- todo: test extras - split off
 
@@ -17,7 +16,6 @@ import GHC.Utils.Misc (filterOut)
 --   -> Assertion
 -- (===) = (@=?)
 
-
 {-
 !! Replace this the endepoints from the spec with every release
 https://w3c.github.io/webdriver/#endpoints - W3C Editor's Draft 10 February 2025
@@ -26,7 +24,9 @@ Method 	URI Template 	Command
 POST 	/session 	New Session
 -}
 endPointsCopiedFromSpc :: String
-endPointsCopiedFromSpc = [r|DELETE 	/session/{session id} 	Delete Session
+endPointsCopiedFromSpc =
+  [r|POST 	/session 	New Session
+DELETE 	/session/{session id} 	Delete Session
 GET 	/status 	Status
 GET 	/session/{session id}/timeouts 	Get Timeouts
 POST 	/session/{session id}/timeouts 	Set Timeouts
@@ -91,10 +91,10 @@ POST 	/session/{session id}/print   Print Page
 parseLine :: Text -> SpecLine
 parseLine line = MkSpecLine method uriTemplate command
   where
-    line' =  filterOut T.null $ T.words $ replaceTemplateTxt line
-    method = case line' of 
+    line' = filterOut T.null $ T.words $ replaceTemplateTxt line
+    method = case line' of
       [] -> "PARSER ERROR NO METHOD IN LINE" <> line
-      x:_ -> x
+      x : _ -> x
     uriTemplate = line' !! 1
     command = T.unwords $ drop 2 line'
 
@@ -119,14 +119,23 @@ windowHandle = Handle "window-handle"
 selector :: Selector
 selector = CSS "Blahh"
 
-data SpecLine = MkSpecLine {
-  method :: Text,
-  uriTemplate :: Text,
-  command :: Text
-} deriving (Show, Eq, Ord)
+name :: Text
+name = "name"
+
+data SpecLine = MkSpecLine
+  { method :: Text,
+    uriTemplate :: Text,
+    command :: Text
+  }
+  deriving (Show, Eq, Ord)
 
 replaceTemplateTxt :: Text -> Text
-replaceTemplateTxt = replace "{session id}" sessionId . replace "{element id}" elementId
+replaceTemplateTxt =
+  replace "{property name}" name
+    . replace "{name}" name
+    . replace "{session id}" sessionId
+    . replace "{element id}" elementId
+    . replace "{shadow id}" elementId
 
 toSpecLine :: W3Spec a -> SpecLine
 toSpecLine w3 = case w3 of
@@ -139,76 +148,79 @@ toSpecLine w3 = case w3 of
     path = replaceTemplateTxt $ "/" <> intercalate "/" w3.path
 
 allSpecsSample :: Set SpecLine
-allSpecsSample = fromList [
-  toSpecLine $ newSession minFirefoxCapabilities
-  , toSpecLine status
-  , toSpecLine $ maximizeWindow session
-  , toSpecLine $ minimizeWindow session
-  , toSpecLine $ fullscreenWindow session
-  , toSpecLine $ getTimeouts session
-  , toSpecLine $ setTimeouts session $ MkTimeouts Nothing Nothing Nothing
-  , toSpecLine $ switchToFrame session TopLevelFrame
-  , toSpecLine $ getCurrentUrl session
-  , toSpecLine $ findElementFromElement session element selector
-  , toSpecLine $ findElementsFromElement session element selector
-  , toSpecLine $ findElements session selector
-  , toSpecLine $ getTitle session
-  , toSpecLine $ getWindowHandle session
-  , toSpecLine $ isElementSelected session element
-  , toSpecLine $ closeWindow session
-  , toSpecLine $ back session
-  , toSpecLine $ forward session
-  , toSpecLine $ refresh session
-  , toSpecLine $ newSession minFirefoxCapabilities
-  , toSpecLine $ deleteSession session
-  , toSpecLine $ getActiveElement session
-  , toSpecLine $ getWindowHandles session
-  , toSpecLine $ newWindow session
-  , toSpecLine $ switchToWindow session windowHandle
-  , toSpecLine $ navigateTo session "url"
-  , toSpecLine $ findElement session selector
-  , toSpecLine $ getWindowRect session
-  , toSpecLine $ elementClick session element
-  , toSpecLine $ getElementText session element
-  , toSpecLine $ switchToParentFrame session
-  , toSpecLine $ getElementProperty session element "someProperty"
-  , toSpecLine $ getElementAttribute session element "someAttribute"
-  , toSpecLine $ getElementCssValue session element "background-color"
-  , toSpecLine $ setWindowRect session (Rect 0 0 1280 720)
-  , toSpecLine $ findElementsFromShadowRoot session element selector
-  , toSpecLine $ getElementShadowRoot session element
-  , toSpecLine $ findElementFromShadowRoot session element {-  -} selector
-  , toSpecLine $ getElementTagName session element
-  , toSpecLine $ getElementRect session element
-  , toSpecLine $ isElementEnabled session element
-  , toSpecLine $ getElementComputedRole session element
-  , toSpecLine $ getElementComputedLabel session element
-  , toSpecLine $ elementClear session element
-  , toSpecLine $ elementSendKeys session element "Some keys"
-  , toSpecLine $ getPageSource session
-  , toSpecLine $ takeScreenshot session
-  , toSpecLine $ takeElementScreenshot session element
-  , toSpecLine $ printPage session
-  , toSpecLine $ executeScript session "console.log('test');" []
-  , toSpecLine $ executeScriptAsync session "console.log('test');" []
-  , toSpecLine $ getAllCookies session
-  , toSpecLine $ getNamedCookie session "testCookie"
-  , toSpecLine $ addCookie session $ MkCookie "testCookie" "testValue" Nothing Nothing Nothing Nothing Nothing Nothing
-  , toSpecLine $ deleteCookie session "testCookie"
-  , toSpecLine $ deleteAllCookies session
-  , toSpecLine $ dismissAlert session
-  , toSpecLine $ acceptAlert session
-  , toSpecLine $ getAlertText session
-  , toSpecLine $ sendAlertText session "Test alert"
-  , toSpecLine $ performActions session $ MkActions []
-  , toSpecLine $ releaseActions session
- ]
+allSpecsSample =
+  fromList
+    [ toSpecLine $ newSession minFirefoxCapabilities,
+      toSpecLine status,
+      toSpecLine $ maximizeWindow session,
+      toSpecLine $ minimizeWindow session,
+      toSpecLine $ fullscreenWindow session,
+      toSpecLine $ getTimeouts session,
+      toSpecLine $ setTimeouts session $ MkTimeouts Nothing Nothing Nothing,
+      toSpecLine $ switchToFrame session TopLevelFrame,
+      toSpecLine $ getCurrentUrl session,
+      toSpecLine $ findElementFromElement session element selector,
+      toSpecLine $ findElementsFromElement session element selector,
+      toSpecLine $ findElements session selector,
+      toSpecLine $ getTitle session,
+      toSpecLine $ getWindowHandle session,
+      toSpecLine $ isElementSelected session element,
+      toSpecLine $ closeWindow session,
+      toSpecLine $ back session,
+      toSpecLine $ forward session,
+      toSpecLine $ refresh session,
+      toSpecLine $ newSession minFirefoxCapabilities,
+      toSpecLine $ deleteSession session,
+      toSpecLine $ getActiveElement session,
+      toSpecLine $ getWindowHandles session,
+      toSpecLine $ newWindow session,
+      toSpecLine $ switchToWindow session windowHandle,
+      toSpecLine $ navigateTo session "url",
+      toSpecLine $ findElement session selector,
+      toSpecLine $ getWindowRect session,
+      toSpecLine $ elementClick session element,
+      toSpecLine $ getElementText session element,
+      toSpecLine $ switchToParentFrame session,
+      toSpecLine $ getElementProperty session element name,
+      toSpecLine $ getElementAttribute session element name,
+      toSpecLine $ getElementCssValue session element name,
+      toSpecLine $ setWindowRect session (Rect 0 0 1280 720),
+      toSpecLine $ findElementsFromShadowRoot session element selector,
+      toSpecLine $ getElementShadowRoot session element,
+      toSpecLine $ findElementFromShadowRoot session element selector,
+      toSpecLine $ getElementTagName session element,
+      toSpecLine $ getElementRect session element,
+      toSpecLine $ isElementEnabled session element,
+      toSpecLine $ getElementComputedRole session element,
+      toSpecLine $ getElementComputedLabel session element,
+      toSpecLine $ elementClear session element,
+      toSpecLine $ elementSendKeys session element "Some keys",
+      toSpecLine $ getPageSource session,
+      toSpecLine $ takeScreenshot session,
+      toSpecLine $ takeElementScreenshot session element,
+      toSpecLine $ printPage session,
+      toSpecLine $ executeScript session "console.log('test');" [],
+      toSpecLine $ executeScriptAsync session "console.log('test');" [],
+      toSpecLine $ getAllCookies session,
+      toSpecLine $ getNamedCookie session name,
+      toSpecLine $ addCookie session $ MkCookie "testCookie" "testValue" Nothing Nothing Nothing Nothing Nothing Nothing,
+      toSpecLine $ deleteCookie session name,
+      toSpecLine $ deleteAllCookies session,
+      toSpecLine $ dismissAlert session,
+      toSpecLine $ acceptAlert session,
+      toSpecLine $ getAlertText session,
+      toSpecLine $ sendAlertText session "Test alert",
+      toSpecLine $ performActions session $ MkActions [],
+      toSpecLine $ releaseActions session
+    ]
 
 -- >>> unit_testAllEndpointsCovered
--- *** Exception: HUnitFailure (Just (SrcLoc {srcLocPackage = "pyrethrum-0.1.0.0-inplace-test", srcLocModule = "ApiCoverageTest", srcLocFile = "/workspaces/pyrethrum/test/ApiCoverageTest.hs", srcLocStartLine = 212, srcLocStartCol = 3, srcLocEndLine = 212, srcLocEndCol = 19})) "Missing specs: fromList [MkSpecLine {method = \"DELETE\", uriTemplate = \"/session/session_id/cookie/{name}\", command = \"Delete Cookie\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/cookie/{name}\", command = \"Get Named Cookie\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/attribute/{name}\", command = \"Get Element Attribute\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/css/{property\", command = \"name} Get Element CSS Value\"},MkSpecLine {method = \"GET\", uriTemplate = \"/session/session_id/element/element_id/property/{name}\", command = \"Get Element Property\"},MkSpecLine {method = \"GET\", uriTemplate = \"/status\", command = \"Status\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/clear\", command = \"Element Clear\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/click\", command = \"Element Click\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/element/element_id/value\", command = \"Element Send Keys\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/shadow/{shadow\", command = \"id}/element Find Element From Shadow Root\"},MkSpecLine {method = \"POST\", uriTemplate = \"/session/session_id/shadow/{shadow\", command = \"id}/elements Find Elements From Shadow Root\"}]"
 unit_testAllEndpointsCovered :: Assertion
 unit_testAllEndpointsCovered = do
-  let missing = specLinesFromSpec `difference` allSpecsSample
-      extra   = allSpecsSample `difference` specLinesFromSpec
-  HUnit.assertBool ("Missing specs: " ++ show missing) (S.null missing)
-  HUnit.assertBool ("Extra specs: " ++ show extra) (S.null extra)
+  -- print allSpecsSample
+  -- putStrLn ""
+  assertBool ("Missing specs:\n " <> show missing) (S.null missing)
+  assertBool ("Extra specs:\n " <> show extra) (S.null extra)
+  where
+    missing = specLinesFromSpec `difference` allSpecsSample
+    extra = allSpecsSample `difference` specLinesFromSpec

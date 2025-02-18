@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+
 
 module WebDriverIO
   ( W.Timeouts (..),

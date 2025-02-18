@@ -1,4 +1,14 @@
-module WebDriverErrors where
+module WebDriverError where
+
+import Data.Aeson (Value, FromJSON (parseJSON))
+import Data.Aeson.Types ((.:), parseMaybe)
+import Data.Text (Text)
+import Data.Map.Strict (Map, fromList, lookup)
+import Data.Eq (Eq)
+import GHC.Show (Show)
+import Data.Ord (Ord)
+import Data.Maybe (Maybe (..), fromMaybe)
+import Data.Function (($))
 
 {-
 Error Code 	HTTP Status 	JSON Error Code 	Description
@@ -34,6 +44,7 @@ unsupported operation 	500 	unsupported operation 	Indicates that a command that
 
 
 data WebDriverError = 
+  UnrecognisedError Text |
   ElementClickIntercepted |
   ElementNotInteractable |
   InsecureCertificate |
@@ -63,3 +74,42 @@ data WebDriverError =
   UnknownMethod |
   UnsupportedOperation
   deriving (Eq, Show, Ord)
+
+
+classifyError :: Value -> Maybe WebDriverError
+classifyError response = do
+  o <- parseMaybe parseJSON response
+  txt <- parseMaybe (.: "error") o
+  Just $ fromMaybe (UnrecognisedError txt) (lookup txt errorCodeMap) 
+
+errorCodeMap :: Map Text WebDriverError
+errorCodeMap = fromList
+  [ ("element click intercepted", ElementClickIntercepted)
+  , ("element not interactable", ElementNotInteractable)
+  , ("insecure certificate", InsecureCertificate)
+  , ("invalid argument", InvalidArgument)
+  , ("invalid cookie domain", InvalidCookieDomain)
+  , ("invalid element state", InvalidElementState)
+  , ("invalid selector", InvalidSelector)
+  , ("invalid session id", InvalidSessionId)
+  , ("javascript error", JavascriptError)
+  , ("move target out of bounds", MoveTargetOutOfBounds)
+  , ("no such alert", NoSuchAlert)
+  , ("no such cookie", NoSuchCookie)
+  , ("no such element", NoSuchElement)
+  , ("no such frame", NoSuchFrame)
+  , ("no such window", NoSuchWindow)
+  , ("no such shadow root", NoSuchShadowRoot)
+  , ("script timeout", ScriptTimeoutError)
+  , ("session not created", SessionNotCreated)
+  , ("stale element reference", StaleElementReference)
+  , ("detached shadow root", DetachedShadowRoot)
+  , ("timeout", Timeout)
+  , ("unable to set cookie", UnableToSetCookie)
+  , ("unable to capture screen", UnableToCaptureScreen)
+  , ("unexpected alert open", UnexpectedAlertOpen)
+  , ("unknown command", UnknownCommand)
+  , ("unknown error", UnknownError)
+  , ("unknown method", UnknownMethod)
+  , ("unsupported operation", UnsupportedOperation)
+  ]

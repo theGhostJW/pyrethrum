@@ -49,6 +49,7 @@ common commonExtensions
       MultiWayIf
       NamedFieldPuns
       NoFieldSelectors
+      NoImplicitPrelude
       NumericUnderscores
       OverloadedStrings
       OverloadedRecordDot
@@ -94,7 +95,8 @@ library
   import: commonExtensions, commonGhcOptions
   exposed-modules:
       Capabilities
-    , WebDriverSpec
+      WebDriverSpec
+      WebDriverError
   hs-source-dirs: src
   other-modules:
       Utils

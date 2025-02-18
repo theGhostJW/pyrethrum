@@ -2,6 +2,7 @@ module WebDriverDemoUtils where
 
 import WebDriverSpec (Selector (CSS, XPath))
 import Data.Text (Text)
+import Data.Semigroup (Semigroup(..))
 
 
 -- ################### urls ##################

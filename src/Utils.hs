@@ -10,6 +10,9 @@ import Data.Aeson
   )
 
 import Data.Text (Text, pack)
+import Data.Functor ((<$>), Functor)
+import GHC.Show (Show (..))
+import Data.Function ((.))
 
 {- 16-02-2025
   this module is duplicated across all libs because HLS had issues win a shared directory

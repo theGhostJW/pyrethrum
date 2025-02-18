@@ -14,7 +14,7 @@ module Capabilities
   )
 where
 
-import Control.Applicative (Alternative (..))
+import Control.Applicative (Alternative (..), Applicative (..))
 import Data.Aeson.Key (fromText)
 import Data.Aeson.Types
   ( FromJSON (parseJSON),
@@ -30,11 +30,18 @@ import Data.Aeson.Types
     (.:),
     (.:?),
   )
-import Data.Bool (bool)
-import Data.Maybe (catMaybes)
+import Data.Bool (bool, Bool)
+import Data.Maybe (catMaybes, Maybe (..), maybe)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Utils (opt)
+import Data.Int (Int)
+import GHC.Show (Show (..))
+import Data.Eq (Eq)
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Control.Monad (Monad(..), MonadFail (..))
+import Data.Semigroup (Semigroup(..))
 
 minCapabilities :: BrowserName -> Capabilities
 minCapabilities browserName =

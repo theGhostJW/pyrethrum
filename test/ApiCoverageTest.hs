@@ -78,6 +78,16 @@ import WebDriverSpec
       switchToWindow,
       takeElementScreenshot,
       takeScreenshot )
+import Data.String (String)
+import GHC.Show (Show (..))
+import Data.Eq (Eq)
+import Data.Ord (Ord)
+import Data.Function (($), (.))
+import Data.Semigroup ((<>))
+import Data.List ((!!), drop, filter)
+import Data.Functor ((<$>))
+import Data.Bool (not)
+import Data.Maybe (Maybe(..))
 
 {-
 !! Replace this the endepoints from the spec with every release

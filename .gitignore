@@ -4,3 +4,4 @@ dist-newstyle/
 simple-hpack.cabal
 *~
 *.hie
+*.log

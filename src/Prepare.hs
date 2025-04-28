@@ -1,6 +1,6 @@
 module Prepare where
 
-import Check (Check, Checks, TerminationStatus (NonTerminal), applyCheck, skipChecks, un)
+import Check (Check, Checks(..), TerminationStatus (NonTerminal), applyCheck, skipChecks)
 import Control.Exception (throwIO)
 import Control.Exception.Extra (throw)
 import Control.Monad.Extra (foldM_)

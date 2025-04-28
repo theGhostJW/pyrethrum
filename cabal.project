@@ -20,7 +20,9 @@ source-repository-package
   location: https://github.com/theGhostJW/pyrethrum-extras
   tag: 1c8d1139cd6b27ff401e688c4c315164f77df80e
 
-
+package pyrethrum-extras
+  ghc-options: -Wno-error=x-partial -Wno-x-partial
+  
 optimization: 0
 
 allow-newer: chronos:base

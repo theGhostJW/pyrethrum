@@ -81,6 +81,8 @@ instance CanDependOn Each Thread
 
 instance CanDependOn Each Each
 
+-- TODO: CHANGE Types that End in ' to Child so Before' -> BeforeChild etc.
+
 data Hook m hz i o where
   Before ::
     (Frequency hz) =>
